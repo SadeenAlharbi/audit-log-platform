@@ -38,8 +38,11 @@ it('continues from the watermark and never archives twice', function () {
     $this->artisan('audit:archive')->assertSuccessful();
     $first = LogArchiver::watermark();
 
+    $runs = BackupRun::query()->where('type', 'logs_archive')->count();
     $this->artisan('audit:archive')->assertSuccessful();
-    expect(BackupRun::query()->where('type', 'logs_archive')->latest('id')->first()->meta['rows'])->toBe(0);
+    // Nothing new: no empty run is recorded and the watermark does not move.
+    expect(BackupRun::query()->where('type', 'logs_archive')->count())->toBe($runs)
+        ->and(LogArchiver::watermark())->toBe($first);
 
     makeAuditLog($project);
     $this->artisan('audit:archive')->assertSuccessful();

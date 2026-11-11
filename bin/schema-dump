@@ -11,6 +11,6 @@ out=database/schema/schema.sql
 docker compose exec -T mariadb sh -c \
     'mariadb-dump --no-data --triggers --routines --skip-comments --skip-dump-date \
         -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' \
-    | sed -E 's/ AUTO_INCREMENT=[0-9]+//' > "$out"
+    | sed -E 's/ AUTO_INCREMENT=[0-9]+//; s#/\*!50017 DEFINER=`[^`]+`@`[^`]+`\*/ ##; /enable the sandbox mode/d' > "$out"
 
 echo "Schema written to $out"

@@ -12,6 +12,8 @@ use Illuminate\Support\Number;
 
 class BackupRunsTable
 {
+    public const STATUS_LABELS = ['succeeded' => 'نجحت', 'failed' => 'فشلت', 'running' => 'قيد التنفيذ'];
+
     public const TYPE_LABELS = [
         'full' => 'كاملة', 'incremental' => 'تزايدية', 'binlog' => 'Binary logs',
         'logs_archive' => 'أرشيف السجلات', 'app_files' => 'ملفات التطبيق',
@@ -28,9 +30,14 @@ class BackupRunsTable
                 TextColumn::make('type')->label('النوع')->badge()
                     ->formatStateUsing(fn (string $state) => self::TYPE_LABELS[$state] ?? $state),
                 TextColumn::make('status')->label('الحالة')->badge()
+                    ->formatStateUsing(fn (string $state) => self::STATUS_LABELS[$state] ?? $state)
                     ->color(fn (string $state) => ['succeeded' => 'success', 'failed' => 'danger', 'running' => 'warning'][$state] ?? 'gray'),
                 TextColumn::make('duration')->label('المدة')
-                    ->state(fn (BackupRun $record) => $record->finished_at ? $record->started_at->diffForHumans($record->finished_at, CarbonInterface::DIFF_ABSOLUTE) : null)
+                    ->state(fn (BackupRun $record) => $record->finished_at
+                        ? ($record->started_at->diffInSeconds($record->finished_at) < 1
+                            ? 'أقل من ثانية'
+                            : $record->started_at->diffForHumans($record->finished_at, CarbonInterface::DIFF_ABSOLUTE))
+                        : null)
                     ->placeholder('—'),
                 TextColumn::make('size')->label('الحجم')
                     ->formatStateUsing(fn ($state) => $state ? Number::fileSize((int) $state) : '—'),
@@ -40,7 +47,7 @@ class BackupRunsTable
             ])
             ->filters([
                 SelectFilter::make('type')->label('النوع')->options(self::TYPE_LABELS),
-                SelectFilter::make('status')->label('الحالة')->options(['succeeded' => 'نجحت', 'failed' => 'فشلت', 'running' => 'قيد التنفيذ']),
+                SelectFilter::make('status')->label('الحالة')->options(self::STATUS_LABELS),
             ])
             ->recordActions([ViewAction::make()])
             ->toolbarActions([]);

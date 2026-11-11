@@ -28,8 +28,10 @@ return [
         'ahead' => (int) env('AUDIT_PARTITIONS_AHEAD', 3),
 
         // Months created before the current month when the table is first
-        // created (to receive late or slightly back-dated events).
-        'backfill' => (int) env('AUDIT_PARTITIONS_BACKFILL', 1),
+        // created. 13 covers the whole retention window (395 days), so a
+        // system that sends its history on onboarding still lands in monthly
+        // partitions that retention can drop, not in p_before.
+        'backfill' => (int) env('AUDIT_PARTITIONS_BACKFILL', 13),
     ],
 
     'storage' => [

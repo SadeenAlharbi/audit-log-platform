@@ -73,3 +73,12 @@ it('requests database backups through backup:run', function () {
     expect(glob(storage_path('framework/testing/spool-run/requests/full-*.req')))->toHaveCount(1);
     File::deleteDirectory(storage_path('framework/testing/spool-run'));
 });
+
+it('does not expose a $batchId on the storage job (it would be read as a Bus batch id)', function () {
+    // Regression: with Telescope or Horizon watching jobs, a public
+    // $batchId made every batch ingestion look up the job_batches table.
+    $job = new StoreAuditLogs([], 42);
+
+    expect(property_exists($job, 'batchId'))->toBeFalse()
+        ->and($job->ingestionBatchId)->toBe(42);
+});

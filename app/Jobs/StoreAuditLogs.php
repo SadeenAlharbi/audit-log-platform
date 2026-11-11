@@ -26,7 +26,9 @@ class StoreAuditLogs implements ShouldQueue
      */
     public function __construct(
         public array $rows,
-        public ?int $batchId = null,
+        // Not named $batchId: Laravel (Bus batches, Telescope, Horizon)
+        // treats a job's $batchId as a job_batches id.
+        public ?int $ingestionBatchId = null,
     ) {}
 
     /** @return list<int> */
@@ -51,8 +53,8 @@ class StoreAuditLogs implements ShouldQueue
             }
         });
 
-        if ($this->batchId !== null) {
-            $batch = IngestionBatch::query()->find($this->batchId);
+        if ($this->ingestionBatchId !== null) {
+            $batch = IngestionBatch::query()->find($this->ingestionBatchId);
             $batch?->forceFill([
                 'status' => $batch->rejected_count > 0 ? 'partially_failed' : 'completed',
                 'processed_at' => now(),
@@ -62,8 +64,8 @@ class StoreAuditLogs implements ShouldQueue
 
     public function failed(?Throwable $e): void
     {
-        if ($this->batchId !== null) {
-            IngestionBatch::query()->whereKey($this->batchId)->update(['status' => 'failed', 'processed_at' => now()]);
+        if ($this->ingestionBatchId !== null) {
+            IngestionBatch::query()->whereKey($this->ingestionBatchId)->update(['status' => 'failed', 'processed_at' => now()]);
         }
 
         app(AlertNotifier::class)->send(

@@ -36,8 +36,13 @@ class AuditLogsTable
                 TextColumn::make('action')->label('العملية')->badge()->color('gray'),
                 TextColumn::make('severity')->label('الخطورة')->badge()
                     ->color(fn (string $state) => self::SEVERITY_COLORS[$state] ?? 'gray'),
-                TextColumn::make('actor_name')->label('الفاعل')->searchable()
-                    ->description(fn (AuditLog $record) => trim(($record->actor_type ?? '').' '.($record->actor_id ?? '')))
+                // Systems often send only actor type + id: show "user #42"
+                // when there is no name, and the type/id under the name.
+                TextColumn::make('actor_name')->label('الفاعل')->searchable(['actor_name', 'actor_id'])
+                    ->state(fn (AuditLog $record) => $record->actor_name
+                        ?? ($record->actor_id !== null ? trim(($record->actor_type ?? '').' #'.$record->actor_id) : null))
+                    ->description(fn (AuditLog $record) => $record->actor_name !== null
+                        ? trim(($record->actor_type ?? '').' '.($record->actor_id ?? '')) : null)
                     ->placeholder('—'),
                 TextColumn::make('subject_id')->label('الكيان')->searchable()
                     ->formatStateUsing(fn (AuditLog $record) => trim(($record->subject_type ?? '').' #'.($record->subject_id ?? ''), ' #'))

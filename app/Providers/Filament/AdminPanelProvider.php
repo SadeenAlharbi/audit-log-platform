@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Support\InitialsAvatarProvider;
 use App\Filament\Widgets\ActiveProjectsTable;
 use App\Filament\Widgets\LogVolumeChart;
 use App\Filament\Widgets\PlatformStats;
@@ -34,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->brandName(config('app.name', 'Audit Log Hub'))
+            ->defaultAvatarProvider(InitialsAvatarProvider::class)
             ->login()
             ->profile(isSimple: false)
             ->passwordReset()

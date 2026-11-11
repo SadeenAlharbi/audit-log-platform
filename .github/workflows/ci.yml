@@ -1,0 +1,100 @@
+# Plan §10: CI runs every check inside the same Docker images as development.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Lint, static analysis, tests (coverage >= 80%)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPOSE_FILE: docker-compose.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Contract guard (Laravel 13 / PHP 8.4 / Node 24 only)
+        run: |
+          grep -q '"php": "\^8.4"' composer.json
+          grep -q '"laravel/framework": "\^13.0"' composer.json
+          grep -q 'ARG PHP_VERSION=8.4' Dockerfile
+          grep -q '"node": ">=24"' package.json
+          test "$(cat .nvmrc)" = "24"
+
+      - name: Prepare .env
+        run: |
+          cp .env.docker.example .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=ci-app/; s/^DB_ROOT_PASSWORD=.*/DB_ROOT_PASSWORD=ci-root/; s/^DB_ARCHIVER_PASSWORD=.*/DB_ARCHIVER_PASSWORD=ci-archiver/; s/^DB_BACKUP_PASSWORD=.*/DB_BACKUP_PASSWORD=ci-backup/' .env
+          sed -i 's/^APP_ENV=.*/APP_ENV=testing/; s/^LOG_STACK=.*/LOG_STACK=stderr/' .env
+
+      - name: Build the dev image
+        run: docker compose build app
+
+      - name: Start MariaDB and Redis
+        run: docker compose up -d mariadb redis
+
+      - name: Install dependencies
+        run: docker compose run --rm --no-deps -T --entrypoint composer app install --no-interaction --prefer-dist --no-progress
+
+      - name: Wait for MariaDB
+        run: |
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q mariadb)")" = healthy ] && exit 0
+            sleep 3
+          done
+          docker compose logs mariadb; exit 1
+
+      - name: App key
+        run: docker compose run --rm -T app php artisan key:generate --force
+
+      - name: Pint
+        run: docker compose run --rm -T app ./vendor/bin/pint --test
+
+      - name: PHPStan (Larastan, level 6)
+        run: docker compose run --rm -T app ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      - name: Tests with coverage
+        run: docker compose run --rm -T app php artisan test --coverage --min=80 --coverage-clover=storage/logs/clover.xml
+
+      - name: API layer coverage >= 80%
+        run: docker compose run --rm -T app php bin/coverage-api storage/logs/clover.xml 80
+
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-clover
+          path: storage/logs/clover.xml
+          if-no-files-found: ignore
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+  openapi:
+    name: OpenAPI document
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npx --yes @redocly/cli@1.34.3 lint docs/openapi.yaml --extends=minimal
+
+  images:
+    name: Production images build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build prod app image (PHP 8.4-FPM + Node 24 assets)
+        run: docker build --target prod -t audit-log-platform/app:ci .
+      - name: Build backup image
+        run: docker build -f docker/backup/Dockerfile -t audit-log-platform/backup:ci .

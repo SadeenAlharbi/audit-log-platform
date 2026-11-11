@@ -1,0 +1,60 @@
+#!/usr/bin/env php
+<?php
+
+/*
+| Plan §10/§15: test coverage of the API layer must be at least 80%.
+| Reads a Clover report and computes line coverage for the files that make
+| up the API: HTTP layer, ingestion, API keys, request signing, masking,
+| security events and the storage job.
+|
+|   php bin/coverage-api storage/logs/clover.xml 80
+*/
+
+$report = $argv[1] ?? 'storage/logs/clover.xml';
+$minimum = (float) ($argv[2] ?? 80);
+
+const API_LAYER = [
+    'app/Http/',
+    'app/Services/Ingestion/',
+    'app/Services/ApiKeys/',
+    'app/Services/Security/SecurityEventRecorder.php',
+    'app/Services/Security/SensitiveDataMasker.php',
+    'app/Support/Auth/',
+    'app/Jobs/StoreAuditLogs.php',
+];
+
+if (! is_file($report)) {
+    fwrite(STDERR, "Clover report not found: {$report}\n");
+    exit(2);
+}
+
+$xml = simplexml_load_file($report);
+$root = realpath(__DIR__.'/..').'/';
+$covered = $total = 0;
+$rows = [];
+
+foreach ($xml->xpath('//file') as $file) {
+    $path = str_replace($root, '', (string) $file['name']);
+    $inLayer = false;
+    foreach (API_LAYER as $prefix) {
+        if (str_starts_with($path, $prefix)) {
+            $inLayer = true;
+            break;
+        }
+    }
+    if (! $inLayer) {
+        continue;
+    }
+
+    $statements = (int) $file->metrics['statements'];
+    $coveredStatements = (int) $file->metrics['coveredstatements'];
+    $total += $statements;
+    $covered += $coveredStatements;
+    $rows[] = sprintf('  %6.1f%%  %s', $statements ? 100 * $coveredStatements / $statements : 100, $path);
+}
+
+$percent = $total ? 100 * $covered / $total : 0;
+echo implode(PHP_EOL, $rows).PHP_EOL;
+printf("API layer coverage: %.1f%% (%d/%d statements), minimum %.0f%%\n", $percent, $covered, $total, $minimum);
+
+exit($percent >= $minimum ? 0 : 1);

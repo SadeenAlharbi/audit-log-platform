@@ -4,6 +4,7 @@ use App\Providers\AppServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\TelescopeServiceProvider;
+use Laravel\Telescope\TelescopeApplicationServiceProvider;
 
 return array_values(array_filter([
     AppServiceProvider::class,
@@ -13,7 +14,7 @@ return array_values(array_filter([
     // Plan §11: Telescope in development only. The package is a dev
     // dependency (absent from the prod image) and is excluded from package
     // discovery in composer.json, so it is registered here, for local only.
-    class_exists(Laravel\Telescope\TelescopeApplicationServiceProvider::class)
+    class_exists(TelescopeApplicationServiceProvider::class)
         && ($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? getenv('APP_ENV')) === 'local'
             ? TelescopeServiceProvider::class
             : null,

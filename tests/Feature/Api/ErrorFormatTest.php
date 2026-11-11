@@ -3,6 +3,7 @@
 use App\Http\Responses\ApiError;
 use App\Models\ProjectApiKey;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /*
 | Plan §6: every API error uses one JSON format with a stable code, and the
@@ -42,7 +43,7 @@ it('hides internal errors from clients when debug is off', function () {
 });
 
 it('maps HTTP exceptions to stable codes', function (int $status, string $code) {
-    $response = ApiError::fromException(new Symfony\Component\HttpKernel\Exception\HttpException($status, 'x'));
+    $response = ApiError::fromException(new HttpException($status, 'x'));
 
     expect($response->getStatusCode())->toBe($status)
         ->and(json_decode((string) $response->getContent(), true)['error']['code'])->toBe($code);

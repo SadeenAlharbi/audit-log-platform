@@ -102,6 +102,6 @@ class SensitiveDataMasker
         $spaced = (string) preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', ' ', $key);
         $parts = preg_split('/[^A-Za-z0-9]+/', strtolower($spaced), -1, PREG_SPLIT_NO_EMPTY);
 
-        return $parts === false ? [] : array_values($parts);
+        return $parts === false ? [] : $parts;
     }
 }

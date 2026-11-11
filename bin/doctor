@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs every check of the project and saves the full output to
+# Runs every check of the project (non-destructive) and saves the full output to
 # storage/logs/doctor.log, so problems can be diagnosed from one file.
 #
 #   ./bin/doctor
@@ -38,7 +38,8 @@ if [ ! -f vendor/autoload.php ]; then
 fi
 
 step "build" docker compose build
-step "up" docker compose up -d --wait --wait-timeout 300
+step "up" docker compose up -d
+for _ in $(seq 1 75); do [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)" 2>/dev/null)" = healthy ] && break; sleep 4; done
 step "status" docker compose ps -a
 
 if ! grep -qE '^APP_KEY=.+' .env; then
@@ -46,7 +47,7 @@ if ! grep -qE '^APP_KEY=.+' .env; then
 fi
 
 step "about" docker compose exec -T app php artisan about --only=environment,drivers
-step "migrate:fresh --seed" docker compose exec -T app php artisan migrate:fresh --seed --force
+step "migrate --seed" docker compose exec -T app php artisan migrate --seed --force
 step "partitions" docker compose exec -T app php artisan audit:partitions
 step "tests" docker compose exec -T app php artisan test
 step "pint" docker compose exec -T app ./vendor/bin/pint --test

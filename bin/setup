@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# First-time setup: builds the images, starts the stack, installs
+# dependencies, generates the app key, runs migrations + seeders.
+#
+#   ./bin/setup
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is required (Docker Desktop on macOS)." >&2
+    exit 1
+fi
+
+if [ ! -f .env ]; then
+    cp .env.docker.example .env
+    echo "Created .env from .env.docker.example - review the passwords in it."
+fi
+
+echo "==> Building images"
+docker compose build
+
+echo "==> Installing PHP dependencies (first run takes a few minutes)"
+if [ ! -f vendor/autoload.php ]; then
+    docker compose run --rm --no-deps --entrypoint composer app install --no-interaction --prefer-dist
+fi
+
+echo "==> Starting the stack"
+docker compose up -d
+
+echo "==> Waiting for the app container to become healthy"
+for _ in $(seq 1 60); do
+    status="$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)" 2>/dev/null || echo starting)"
+    [ "$status" = "healthy" ] && break
+    sleep 5
+done
+if [ "${status:-}" != "healthy" ]; then
+    echo "app did not become healthy - check: docker compose logs app" >&2
+    exit 1
+fi
+
+if ! grep -qE '^APP_KEY=.+' .env; then
+    docker compose exec -T app php artisan key:generate --force
+fi
+
+echo "==> Migrating and seeding"
+docker compose exec -T app php artisan migrate --seed --force
+
+echo
+echo "Done. App: http://localhost:$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 8080)"
+echo "Run the schema tests with: make test"

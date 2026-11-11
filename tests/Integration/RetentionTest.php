@@ -1,0 +1,69 @@
+<?php
+
+use App\Models\AuditLog;
+use App\Models\Project;
+use App\Support\Database\AuditLogPartitionManager;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    Storage::fake('archive');
+    config(['audit.archive.settle_seconds' => 0]);
+});
+
+it('archives then deletes logs older than the project retention through the archiver account', function () {
+    $short = Project::factory()->create(['retention_days' => 7]);
+    $long = Project::factory()->create(['retention_days' => 365]);
+
+    $old = now()->utc()->subDays(20);
+    makeAuditLog($short, ['occurred_at' => $old]);
+    makeAuditLog($short, ['occurred_at' => now()]);
+    makeAuditLog($long, ['occurred_at' => $old]);
+
+    $this->artisan('audit:prune')->assertSuccessful();
+
+    expect(AuditLog::query()->withoutGlobalScopes()->where('project_id', $short->id)->count())->toBe(1)
+        ->and(AuditLog::query()->withoutGlobalScopes()->where('project_id', $long->id)->count())->toBe(1)
+        ->and(Storage::disk('archive')->allFiles('logs/'.$short->slug))->not->toBeEmpty();
+});
+
+it('never deletes rows that are not archived yet', function () {
+    $project = Project::factory()->create(['retention_days' => 7]);
+    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+
+    $this->artisan('audit:prune --skip-archive')->assertSuccessful();
+
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+it('drops monthly partitions older than the platform maximum', function () {
+    // Pretend the platform keeps 1 day: last month's partition is expired.
+    config(['audit.retention.max_days' => 1]);
+    $project = Project::factory()->create(['retention_days' => 1]);
+    $lastMonth = CarbonImmutable::now('UTC')->startOfMonth()->subMonth()->addDays(2);
+    makeAuditLog($project, ['occurred_at' => $lastMonth, 'external_id' => 'k1']);
+    DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'k1', 'log_uid' => 'x', 'occurred_at' => $lastMonth->format('Y-m-d H:i:s.v'), 'created_at' => now()]);
+
+    $this->artisan('audit:prune')->assertSuccessful();
+
+    $names = collect(app(AuditLogPartitionManager::class)->partitions())->pluck('name');
+    expect($names)->not->toContain(AuditLogPartitionManager::nameFor($lastMonth->startOfMonth()))
+        ->and(DB::table('ingestion_keys')->count())->toBe(0);
+});
+
+it('restores one project from the archive without duplicates', function () {
+    $project = Project::factory()->create(['retention_days' => 7]);
+    $log = makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20), 'new_values' => ['a' => 1]]);
+    $this->artisan('audit:prune')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
+
+    $this->artisan('audit:restore-archive', ['project' => $project->slug, '--from' => now()->subDays(30)->toDateString(), '--to' => now()->toDateString()])
+        ->assertSuccessful();
+    $this->artisan('audit:restore-archive', ['project' => $project->slug])->assertSuccessful();
+
+    $restored = AuditLog::query()->withoutGlobalScopes()->get();
+    expect($restored)->toHaveCount(1)
+        ->and($restored->first()->uid)->toBe($log->uid)
+        ->and($restored->first()->new_values)->toBe(['a' => 1]);
+});

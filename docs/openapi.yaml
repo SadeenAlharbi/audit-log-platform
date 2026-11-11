@@ -1,0 +1,474 @@
+openapi: 3.1.0
+info:
+  title: Audit Log Hub API
+  version: 1.0.0
+  summary: Central audit log platform — the official contract for every system that sends or reads audit logs.
+  description: |
+    Any system, in any language, sends its audit logs to this API. The
+    Laravel package `company/audit-client` is only a thin wrapper around it.
+
+    ## Authentication
+    Every call (except `/health`) sends:
+
+    | Header | Value |
+    |---|---|
+    | `Authorization` | `Bearer <api_key>` |
+    | `X-Project` | the project slug |
+
+    Keys have scopes: `logs:write` (send) and/or `logs:read` (query).
+
+    ## Request signing (HMAC-SHA256)
+    Keys created with a signing secret must also send:
+
+    | Header | Value |
+    |---|---|
+    | `X-Timestamp` | current Unix time in seconds |
+    | `X-Signature` | `hex(HMAC-SHA256(secret, canonical))` |
+
+    where `canonical` is the four lines below joined with `\n`:
+
+    ```
+    {X-Timestamp}
+    {HTTP method, upper case}
+    {path and query exactly as sent, e.g. /api/v1/logs?severity=critical}
+    {raw request body, empty for GET}
+    ```
+
+    Requests whose timestamp is more than 5 minutes away from the server
+    clock, or that reuse a signature, are rejected.
+
+    ## Idempotency
+    Send a unique `external_id` per event. A second log with the same
+    `external_id` in the same project is answered with `409 duplicate` and
+    the `uid` of the first one, so retries are always safe.
+
+    ## Asynchronous storage
+    Accepted logs are queued and stored within seconds. The `202` response
+    carries the log `uid` (ULID), which can be queried later.
+
+    ## Errors
+    All errors share one format:
+
+    ```json
+    { "error": { "code": "validation", "message": "...", "details": { } } }
+    ```
+
+    Codes: `validation`, `unauthorized`, `forbidden`, `rate_limited`,
+    `duplicate`, `not_found`, `method_not_allowed`, `payload_too_large`,
+    `unsupported_media_type`, `server_error`.
+
+    ## Limits
+    * 1,000 requests per minute per key (`429` with `Retry-After`).
+    * Request body up to 1 MB; up to 500 logs per batch.
+    * `occurred_at` must be within the retention period and at most 5 minutes in the future.
+    * Logs can never be modified or deleted through the API.
+servers:
+  - url: /api/v1
+    description: This server
+security:
+  - apiKey: []
+    project: []
+tags:
+  - name: Ingestion
+  - name: Query
+  - name: System
+
+paths:
+  /logs:
+    post:
+      tags: [Ingestion]
+      operationId: createLog
+      summary: Send one audit log
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogInput' }
+            examples:
+              orderPaid:
+                value:
+                  external_id: order-1001-paid
+                  event: order.paid
+                  action: update
+                  severity: info
+                  occurred_at: '2026-11-11T10:00:00Z'
+                  actor: { type: user, id: '42', name: Sara, ip: 10.0.0.5 }
+                  subject: { type: order, id: '1001' }
+                  old_values: { status: pending }
+                  new_values: { status: paid }
+                  tags: [billing]
+                  correlation_id: checkout-7f3a
+      responses:
+        '202':
+          description: Accepted and queued for storage.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      uid: { $ref: '#/components/schemas/Uid' }
+                      status: { type: string, const: accepted }
+        '409':
+          description: A log with this external_id was already received.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: duplicate, message: A log with this external_id was already received., details: { uid: 01JCDE0Z8Y2K7Q4M9V3N5T6W8X, external_id: order-1001-paid } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+    get:
+      tags: [Query]
+      operationId: listLogs
+      summary: Query logs of the project (newest first, cursor pagination)
+      description: Requires the `logs:read` scope. Without `from`/`to` the last 30 days are returned; a range may cover up to 400 days. Sensitive values (passwords, tokens…) are masked.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Signature'
+        - { name: event, in: query, schema: { type: string }, description: 'Exact event, or a prefix ending with `*` (e.g. `user.*`).' }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: severity, in: query, schema: { type: string }, description: 'Comma separated: info,warning,critical' }
+        - { name: actor_type, in: query, schema: { type: string } }
+        - { name: actor_id, in: query, schema: { type: string } }
+        - { name: subject_type, in: query, schema: { type: string } }
+        - { name: subject_id, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: correlation_id, in: query, schema: { type: string } }
+        - { name: request_id, in: query, schema: { type: string } }
+        - { name: external_id, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time }, description: occurred_at from (inclusive) }
+        - { name: to, in: query, schema: { type: string, format: date-time }, description: occurred_at to (inclusive) }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string }, description: Value of meta.next_cursor from the previous page. }
+      responses:
+        '200':
+          description: A page of logs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Log' }
+                  meta:
+                    type: object
+                    properties:
+                      path: { type: string }
+                      per_page: { type: integer }
+                      next_cursor: { type: [string, 'null'] }
+                      prev_cursor: { type: [string, 'null'] }
+                  links:
+                    type: object
+                    properties:
+                      next: { type: [string, 'null'] }
+                      prev: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /logs/batch:
+    post:
+      tags: [Ingestion]
+      operationId: createLogBatch
+      summary: Send up to 500 logs in one request
+      description: Each item is validated on its own. Valid items are accepted even if others are rejected; the response reports every item by its index. If no item is valid the answer is `422`.
+      parameters:
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [logs]
+              additionalProperties: false
+              properties:
+                logs:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/LogInput' }
+      responses:
+        '202':
+          description: Batch accepted (fully or partly).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BatchResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /logs/{uid}:
+    get:
+      tags: [Query]
+      operationId: getLog
+      summary: One log of the project
+      parameters:
+        - { name: uid, in: path, required: true, schema: { $ref: '#/components/schemas/Uid' } }
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: The log.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Log' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /batches/{uid}:
+    get:
+      tags: [Ingestion]
+      operationId: getBatch
+      summary: Outcome of a batch
+      description: Requires `logs:write`. Status moves from `queued` to `completed`, `partially_failed` (some items were rejected) or `failed`.
+      parameters:
+        - { name: uid, in: path, required: true, schema: { $ref: '#/components/schemas/Uid' } }
+        - $ref: '#/components/parameters/Timestamp'
+        - $ref: '#/components/parameters/Signature'
+      responses:
+        '200':
+          description: Batch status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      batch_uid: { $ref: '#/components/schemas/Uid' }
+                      status: { type: string, enum: [queued, processing, completed, partially_failed, failed] }
+                      total: { type: integer }
+                      accepted: { type: integer }
+                      duplicates: { type: integer }
+                      rejected: { type: integer }
+                      errors: { type: array, items: { type: object } }
+                      received_at: { type: string, format: date-time }
+                      processed_at: { type: [string, 'null'], format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /health:
+    get:
+      tags: [System]
+      operationId: health
+      summary: Readiness check (no authentication)
+      security: []
+      responses:
+        '200':
+          description: Database, Redis and queue are reachable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: A dependency is down.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: Project API key (`alh_…`). Shown once when created; stored as a SHA-256 hash.
+    project:
+      type: apiKey
+      in: header
+      name: X-Project
+      description: Project slug.
+
+  parameters:
+    Timestamp:
+      name: X-Timestamp
+      in: header
+      required: false
+      description: Required for signed keys. Unix time in seconds.
+      schema: { type: string, pattern: '^[0-9]+$' }
+    Signature:
+      name: X-Signature
+      in: header
+      required: false
+      description: Required for signed keys. Lower-case hex HMAC-SHA256 of the canonical string (optionally prefixed with `sha256=`).
+      schema: { type: string, pattern: '^(sha256=)?[0-9a-f]{64}$' }
+
+  schemas:
+    Uid:
+      type: string
+      description: ULID
+      pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      example: 01JCDE0Z8Y2K7Q4M9V3N5T6W8X
+
+    LogInput:
+      type: object
+      additionalProperties: false
+      required: [event, action, occurred_at]
+      properties:
+        external_id: { type: [string, 'null'], maxLength: 191, description: 'Idempotency key, unique per project.' }
+        event: { type: string, maxLength: 191, pattern: '^[A-Za-z0-9][A-Za-z0-9_.:\-/]*$', example: user.updated }
+        action: { type: string, maxLength: 32, pattern: '^[a-z][a-z0-9_.\-]*$', description: 'create / update / delete / login / logout / custom…' }
+        severity: { type: string, enum: [info, warning, critical], default: info }
+        occurred_at: { type: string, format: date-time, description: When it happened in the source system. Converted to UTC. }
+        actor:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            type: { type: [string, 'null'], maxLength: 191 }
+            id: { type: [string, integer, 'null'], maxLength: 191 }
+            name: { type: [string, 'null'], maxLength: 255 }
+            ip: { type: [string, 'null'], format: ip }
+            user_agent: { type: [string, 'null'], maxLength: 512 }
+        subject:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            type: { type: [string, 'null'], maxLength: 191 }
+            id: { type: [string, integer, 'null'], maxLength: 191 }
+        old_values: { type: [object, array, 'null'] }
+        new_values: { type: [object, array, 'null'] }
+        metadata: { type: [object, array, 'null'] }
+        tags:
+          type: [array, 'null']
+          maxItems: 20
+          items: { type: string, maxLength: 50 }
+        request_id: { type: [string, 'null'], maxLength: 64 }
+        correlation_id: { type: [string, 'null'], maxLength: 64 }
+
+    Log:
+      type: object
+      properties:
+        uid: { $ref: '#/components/schemas/Uid' }
+        external_id: { type: [string, 'null'] }
+        event: { type: string }
+        action: { type: string }
+        severity: { type: string, enum: [info, warning, critical] }
+        actor:
+          type: object
+          properties:
+            type: { type: [string, 'null'] }
+            id: { type: [string, 'null'] }
+            name: { type: [string, 'null'] }
+            ip: { type: [string, 'null'] }
+            user_agent: { type: [string, 'null'] }
+        subject:
+          type: object
+          properties:
+            type: { type: [string, 'null'] }
+            id: { type: [string, 'null'] }
+        old_values: { type: [object, array, 'null'], description: Sensitive keys are masked. }
+        new_values: { type: [object, array, 'null'], description: Sensitive keys are masked. }
+        metadata: { type: [object, array, 'null'] }
+        tags: { type: array, items: { type: string } }
+        request_id: { type: [string, 'null'] }
+        correlation_id: { type: [string, 'null'] }
+        occurred_at: { type: string, format: date-time, example: '2026-11-11T10:00:00.000Z' }
+        received_at: { type: string, format: date-time }
+
+    BatchResult:
+      type: object
+      properties:
+        batch_uid: { $ref: '#/components/schemas/Uid' }
+        status: { type: string, enum: [queued, completed, failed] }
+        total: { type: integer }
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        rejected: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              status: { type: string, enum: [accepted, duplicate, rejected] }
+              uid: { $ref: '#/components/schemas/Uid' }
+              external_id: { type: string }
+              errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        checks:
+          type: object
+          additionalProperties: { type: string, enum: [ok, fail, skipped] }
+        queue_size: { type: [integer, 'null'] }
+        time: { type: string, format: date-time }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [validation, unauthorized, forbidden, rate_limited, duplicate, not_found, method_not_allowed, payload_too_large, unsupported_media_type, server_error]
+            message: { type: string }
+            details: { type: object }
+
+  responses:
+    Unauthorized:
+      description: Missing, unknown, revoked or expired key, wrong project, or invalid signature.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: unauthorized, message: Missing or invalid credentials. } }
+    Forbidden:
+      description: Key lacks the scope, IP not allowed, project archived, or HTTPS required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found in this project.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Validation:
+      description: Invalid input. `details` maps each field to its messages.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: validation, message: The given data was invalid., details: { occurred_at: [The occurred_at field is required.] } } }
+    PayloadTooLarge:
+      description: Body larger than 1 MB.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnsupportedMediaType:
+      description: Body is not application/json.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Too many requests for this key.
+      headers:
+        Retry-After: { schema: { type: integer }, description: Seconds to wait. }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

@@ -1,0 +1,27 @@
+# MariaDB 11 settings for the Audit Log Platform.
+[mysqld]
+character-set-server = utf8mb4
+collation-server     = utf8mb4_unicode_ci
+default-time-zone    = '+00:00'
+
+# InnoDB
+innodb_file_per_table          = 1
+# zlib is used by PAGE_COMPRESSED tables (audit_logs)
+innodb_compression_algorithm   = zlib
+# dev value - size to ~60-70% of RAM in production
+innodb_buffer_pool_size        = 512M
+innodb_flush_log_at_trx_commit = 1
+max_allowed_packet             = 64M
+
+# Binary logs (plan §12 + decision D5).
+# Mariabackup takes the full/incremental snapshots; binary logs fill the gap
+# between them so we can restore to an exact point in time.
+server_id        = 1
+log_bin          = mariadb-bin
+binlog_format    = ROW
+sync_binlog      = 1
+expire_logs_days = 8
+
+# Required because log_bin is on: lets the migration user create the
+# append-only triggers without the SUPER privilege.
+log_bin_trust_function_creators = 1

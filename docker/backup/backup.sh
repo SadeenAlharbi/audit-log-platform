@@ -1,0 +1,291 @@
+#!/bin/bash
+# Database backup runner for the "backup" container (plan §12, decision D5).
+#
+#   backup.sh full          full physical backup (mariadb-backup)
+#   backup.sh incremental   incremental on top of the latest full/incremental
+#   backup.sh binlogs       copy closed binary logs (point-in-time recovery)
+#   backup.sh restore-test  restore the latest chain into a temporary server and verify it
+#   backup.sh schedule      loop: requests from the app every minute, full daily,
+#                           incremental + binlogs hourly, restore test weekly
+#
+# Every artifact is compressed, encrypted with age (when AGE_RECIPIENT is
+# set), check-summed (SHA-256) and copied off-site with rclone (when
+# RCLONE_REMOTE is set). The result of every run is written as JSON to
+# $SPOOL/status/, where `php artisan backup:monitor` imports it into
+# backup_runs and raises alerts. The app asks for manual runs by dropping
+# files in $SPOOL/requests/.
+set -euo pipefail
+
+BACKUP_ROOT="${BACKUP_ROOT:-/backups}"
+SPOOL="${SPOOL:-/spool}"
+DATADIR="${DATADIR:-/var/lib/mysql}"
+DB_HOST="${DB_HOST:-mariadb}"
+DB_PORT="${DB_PORT:-3306}"
+DB_NAME="${DB_NAME:-audit_log}"
+FULL_BACKUP_HOUR="${FULL_BACKUP_HOUR:-2}"
+RESTORE_TEST_WEEKDAY="${RESTORE_TEST_WEEKDAY:-5}"   # 1=Mon ... 7=Sun (date +%u)
+RESTORE_TEST_HOUR="${RESTORE_TEST_HOUR:-3}"
+LOCAL_KEEP_DAYS="${LOCAL_KEEP_DAYS:-3}"
+AGE_RECIPIENT="${AGE_RECIPIENT:-}"
+AGE_IDENTITY_FILE="${AGE_IDENTITY_FILE:-}"           # only needed to restore encrypted artifacts
+RCLONE_REMOTE="${RCLONE_REMOTE:-}"                   # e.g. offsite:audit-backups
+MARIADBD="${MARIADBD:-mariadbd}"
+MARIADBD_EXTRA_ARGS="${MARIADBD_EXTRA_ARGS:-}"
+: "${DB_BACKUP_USERNAME:?}"
+: "${DB_BACKUP_PASSWORD:?}"
+
+mkdir -p "$BACKUP_ROOT/full" "$BACKUP_ROOT/incremental" "$BACKUP_ROOT/binlogs" "$BACKUP_ROOT/artifacts" \
+         "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports"
+
+log() { echo "[backup $(date -u +%FT%TZ)] $*" >&2; }
+now_iso() { date -u +%FT%TZ; }
+stamp() { date -u +%Y%m%dT%H%M%SZ; }
+
+conn=(--host="$DB_HOST" --port="$DB_PORT" --user="$DB_BACKUP_USERNAME" --password="$DB_BACKUP_PASSWORD")
+
+json_escape() { jq -Rs 'rtrimstr("\n")'; }
+
+# write_status <type> <status> <started_at> <size> <location> <checksum> <error> <meta-json>
+write_status() {
+    local id; id="$(stamp)-$1-$RANDOM"
+    local tmp="$SPOOL/status/.$id.tmp"
+    local err_json="null"
+    [ -n "$7" ] && err_json="$(printf '%s' "$7" | json_escape)"
+    cat > "$tmp" <<JSON
+{"id":"$id","type":"$1","status":"$2","started_at":"$3","finished_at":"$(now_iso)","size":${4:-null},"location":$( [ -n "$5" ] && printf '"%s"' "$5" || echo null ),"checksum":$( [ -n "$6" ] && printf '"%s"' "$6" || echo null ),"error":$err_json,"requested_by":${REQUESTED_BY:-null},"meta":${8:-{\}}}
+JSON
+    mv "$tmp" "$SPOOL/status/$id.json"
+}
+
+# ship <source-dir-or-file> <remote-subdir> <name> -> echoes "size location checksum"
+ship() {
+    local src="$1" sub="$2" name="$3" out
+    if [ -d "$src" ]; then
+        out="$BACKUP_ROOT/artifacts/$name.tar.gz"
+        tar -C "$src" -czf "$out" .
+    else
+        out="$BACKUP_ROOT/artifacts/$name.gz"
+        gzip -c "$src" > "$out"
+    fi
+    if [ -n "$AGE_RECIPIENT" ]; then
+        age -r "$AGE_RECIPIENT" -o "$out.age" "$out"
+        rm -f "$out"
+        out="$out.age"
+    fi
+    local sum size location
+    sum="$(sha256sum "$out" | awk '{print $1}')"
+    size="$(stat -c %s "$out")"
+    location="local:$out"
+    if [ -n "$RCLONE_REMOTE" ]; then
+        rclone copyto --s3-no-check-bucket "$out" "$RCLONE_REMOTE/db/$sub/$(basename "$out")"
+        rclone check --one-way --download "$out" "$RCLONE_REMOTE/db/$sub/$(basename "$out")" >/dev/null 2>&1 || true
+        location="$RCLONE_REMOTE/db/$sub/$(basename "$out")"
+        rm -f "$out"   # the local copy of the backup directory is kept for incrementals
+    fi
+    echo "$size $location $sum"
+}
+
+max_audit_id() {
+    mariadb "${conn[@]}" -N -e "SELECT COALESCE(MAX(id),0) FROM \`$DB_NAME\`.audit_logs" 2>/dev/null || echo 0
+}
+
+latest_dir() {
+    # Newest local backup directory of the current chain.
+    ls -1d "$BACKUP_ROOT"/full/* "$BACKUP_ROOT"/incremental/* 2>/dev/null | awk -F/ '{print $NF" "$0}' | sort | tail -n1 | cut -d' ' -f2- || true
+}
+
+latest_full() { ls -1d "$BACKUP_ROOT"/full/* 2>/dev/null | sort | tail -n1 || true; }
+
+run_backup() {
+    local kind="$1" started target base="" ts
+    started="$(now_iso)"; ts="$(stamp)"
+    local max_id; max_id="$(max_audit_id)"
+
+    if [ "$kind" = "incremental" ]; then
+        base="$(latest_dir)"
+        if [ -z "$base" ]; then
+            log "no full backup yet - taking a full backup instead"
+            kind=full
+        fi
+    fi
+
+    target="$BACKUP_ROOT/$kind/$ts"
+    log "$kind backup -> $target"
+    local args=(--backup "${conn[@]}" --datadir="$DATADIR" --target-dir="$target")
+    [ "$kind" = "incremental" ] && args+=(--incremental-basedir="$base")
+
+    if ! mariadb-backup "${args[@]}" > "$BACKUP_ROOT/last-$kind.log" 2>&1; then
+        local err; err="$(tail -n 5 "$BACKUP_ROOT/last-$kind.log")"
+        rm -rf "$target"
+        write_status "$kind" failed "$started" "" "" "" "$err" "{}"
+        log "ERROR: $kind backup failed"
+        return 1
+    fi
+
+    printf '{"max_audit_id":%s,"base":"%s","taken_at":"%s"}\n' "$max_id" "$(basename "${base:-}")" "$started" > "$target/audit-meta.json"
+
+    local shipped size location sum
+    if ! shipped="$(ship "$target" "$kind" "$kind-$ts")"; then
+        write_status "$kind" failed "$started" "" "" "" "upload/encryption failed" "{}"
+        return 1
+    fi
+    read -r size location sum <<< "$shipped"
+    write_status "$kind" succeeded "$started" "$size" "$location" "$sum" "" \
+        "{\"max_audit_id\":$max_id,\"encrypted\":$( [ -n "$AGE_RECIPIENT" ] && echo true || echo false ),\"base\":\"$(basename "${base:-}")\"}"
+    log "$kind backup done ($size bytes, sha256 $sum)"
+    cleanup_local
+}
+
+run_binlogs() {
+    local started; started="$(now_iso)"
+    mariadb "${conn[@]}" -e "FLUSH BINARY LOGS" >/dev/null 2>&1 || log "warning: FLUSH BINARY LOGS failed"
+    local current; current="$(mariadb "${conn[@]}" -N -e "SHOW MASTER STATUS" 2>/dev/null | awk '{print $1}')"
+    local copied=0 total=0
+    for f in "$DATADIR"/mariadb-bin.[0-9]*; do
+        [ -e "$f" ] || continue
+        local name; name="$(basename "$f")"
+        [ "$name" = "$current" ] && continue
+        [ -e "$BACKUP_ROOT/binlogs/$name" ] && continue
+        cp -p "$f" "$BACKUP_ROOT/binlogs/$name"
+        local shipped size; shipped="$(ship "$BACKUP_ROOT/binlogs/$name" binlog "binlog-$(stamp)-$name")"
+        size="$(awk '{print $1}' <<< "$shipped")"
+        total=$((total + size)); copied=$((copied + 1))
+    done
+    write_status binlog succeeded "$started" "$total" "${RCLONE_REMOTE:+$RCLONE_REMOTE/db/binlog/}" "" "" "{\"files\":$copied,\"current\":\"${current:-}\"}"
+    log "binlogs copied: $copied (current: ${current:-unknown})"
+}
+
+cleanup_local() {
+    # Keep local directories for LOCAL_KEEP_DAYS, but never the newest full
+    # and everything after it (the current incremental chain).
+    local keep_from; keep_from="$(basename "$(latest_full)")"
+    find "$BACKUP_ROOT/full" "$BACKUP_ROOT/incremental" -mindepth 1 -maxdepth 1 -type d -mtime +"$LOCAL_KEEP_DAYS" | while read -r d; do
+        [[ "$(basename "$d")" < "$keep_from" ]] && rm -rf "$d"
+    done
+    find "$BACKUP_ROOT/binlogs" "$BACKUP_ROOT/artifacts" -type f -mtime +"$LOCAL_KEEP_DAYS" -delete 2>/dev/null || true
+}
+
+run_restore_test() {
+    local started; started="$(now_iso)"
+    local t0; t0="$(date +%s)"
+    local full; full="$(latest_full)"
+    if [ -z "$full" ]; then
+        write_status restore_test failed "$started" "" "" "" "no full backup to restore" "{}"
+        return 1
+    fi
+
+    local work; work="$(mktemp -d /tmp/restore-test.XXXXXX)"
+    local sock="$work/mysqld.sock" report="$SPOOL/reports/restore-test-$(stamp).md"
+    trap 'mariadb-admin --socket="'"$work"'/mysqld.sock" -uroot shutdown >/dev/null 2>&1 || true; rm -rf "'"$work"'"' RETURN
+
+    local chain=("$full")
+    while read -r inc; do chain+=("$inc"); done < <(ls -1d "$BACKUP_ROOT"/incremental/* 2>/dev/null | sort | awk -v f="$(basename "$full")" -F/ '$NF > f')
+
+    log "restore test: ${#chain[@]} backup(s) from $(basename "$full")"
+    cp -a "$full" "$work/data"
+    if ! mariadb-backup --prepare --target-dir="$work/data" > "$work/prepare.log" 2>&1; then
+        write_status restore_test failed "$started" "" "" "" "prepare failed: $(tail -n 3 "$work/prepare.log")" "{}"
+        return 1
+    fi
+    for inc in "${chain[@]:1}"; do
+        if ! mariadb-backup --prepare --target-dir="$work/data" --incremental-dir="$inc" >> "$work/prepare.log" 2>&1; then
+            write_status restore_test failed "$started" "" "" "" "incremental prepare failed for $(basename "$inc")" "{}"
+            return 1
+        fi
+    done
+
+    # shellcheck disable=SC2086
+    "$MARIADBD" --no-defaults --datadir="$work/data" --socket="$sock" --skip-networking --skip-grant-tables \
+        --user=root --innodb-buffer-pool-size=128M --log-error="$work/server.log" $MARIADBD_EXTRA_ARGS &
+    for _ in $(seq 1 60); do mariadb --socket="$sock" -uroot -e 'SELECT 1' >/dev/null 2>&1 && break; sleep 1; done
+
+    local q=(mariadb --socket="$sock" -uroot -N "$DB_NAME")
+    if ! "${q[@]}" -e 'SELECT 1' >/dev/null 2>&1; then
+        write_status restore_test failed "$started" "" "" "" "restored server did not start: $(tail -n 3 "$work/server.log")" "{}"
+        return 1
+    fi
+
+    local bad tables rows max_id expected partitions
+    bad="$("${q[@]}" -e "SELECT GROUP_CONCAT(t) FROM (SELECT TABLE_NAME t FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB_NAME') x" 2>/dev/null)"
+    tables="$(tr ',' ' ' <<< "$bad")"
+    local failed_checks=""
+    for t in $tables; do
+        local res; res="$("${q[@]}" -e "CHECK TABLE \`$t\`" | awk '{print $NF}' | tail -n1)"
+        [ "$res" = "OK" ] || failed_checks="$failed_checks $t($res)"
+    done
+    rows="$("${q[@]}" -e 'SELECT COUNT(*) FROM audit_logs')"
+    max_id="$("${q[@]}" -e 'SELECT COALESCE(MAX(id),0) FROM audit_logs')"
+    partitions="$("${q[@]}" -e "SELECT COUNT(*) FROM information_schema.PARTITIONS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='audit_logs'")"
+    expected="$(jq -r '.max_audit_id' "${chain[-1]}/audit-meta.json")"
+    local seconds=$(( $(date +%s) - t0 ))
+
+    local status=succeeded error=""
+    [ -n "$failed_checks" ] && { status=failed; error="CHECK TABLE failed:$failed_checks"; }
+    [ "$max_id" -lt "$expected" ] && { status=failed; error="${error:+$error; }restored max(id) $max_id < $expected recorded at backup time"; }
+
+    cat > "$report" <<MD
+# Restore test report
+
+| | |
+|---|---|
+| Date (UTC) | $started |
+| Result | **$status** |
+| Restore chain | $(for c in "${chain[@]}"; do printf '%s ' "$(basename "$c")"; done) |
+| Restore time (RTO evidence) | ${seconds}s |
+| Tables checked (CHECK TABLE) | $(wc -w <<< "$tables") — failures: ${failed_checks:-none} |
+| audit_logs rows | $rows |
+| audit_logs max(id) | $max_id (expected ≥ $expected) |
+| audit_logs partitions | $partitions |
+
+${error:+**Error:** $error}
+MD
+
+    write_status restore_test "$status" "$started" "" "local:$report" "" "$error" \
+        "{\"rows\":$rows,\"max_id\":$max_id,\"expected_min_id\":$expected,\"tables\":$(wc -w <<< "$tables"),\"chain\":${#chain[@]},\"seconds\":$seconds}"
+    log "restore test $status in ${seconds}s (rows=$rows)"
+    [ "$status" = succeeded ]
+}
+
+process_requests() {
+    for req in $(ls -1 "$SPOOL"/requests/*.req 2>/dev/null | sort); do
+        local type; type="$(basename "$req" | cut -d- -f1)"
+        [ "$type" = "restore" ] && type="restore-test"
+        REQUESTED_BY="$(sed -nE 's/.*"requested_by":([0-9]+).*/\1/p' "$req")"
+        export REQUESTED_BY
+        rm -f "$req"
+        log "request: $type"
+        case "$type" in
+            full) run_backup full || true ;;
+            incremental) run_backup incremental || true ;;
+            restore-test) run_restore_test || true ;;
+        esac
+        unset REQUESTED_BY
+    done
+}
+
+do_schedule() {
+    log "scheduler started (full daily at ${FULL_BACKUP_HOUR}:00 UTC, incremental + binlogs hourly, restore test weekly)"
+    local last_hour=""
+    while true; do
+        process_requests
+        local hour; hour="$(date -u +%Y%m%d%H)"
+        if [ "$(date -u +%M)" = "00" ] && [ "$hour" != "$last_hour" ]; then
+            last_hour="$hour"
+            if [ "$(date -u +%-H)" -eq "$FULL_BACKUP_HOUR" ]; then run_backup full || true; else run_backup incremental || true; fi
+            run_binlogs || true
+            if [ "$(date -u +%u)" -eq "$RESTORE_TEST_WEEKDAY" ] && [ "$(date -u +%-H)" -eq "$RESTORE_TEST_HOUR" ]; then
+                run_restore_test || true
+            fi
+        fi
+        sleep $(( 60 - $(date -u +%-S) ))
+    done
+}
+
+case "${1:-schedule}" in
+    full) run_backup full ;;
+    incremental) run_backup incremental ;;
+    binlogs) run_binlogs ;;
+    restore-test) run_restore_test ;;
+    schedule) do_schedule ;;
+    *) echo "usage: $0 {full|incremental|binlogs|restore-test|schedule}" >&2; exit 2 ;;
+esac

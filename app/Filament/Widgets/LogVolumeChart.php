@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\AuditLog;
+use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+
+class LogVolumeChart extends ChartWidget
+{
+    protected static ?int $sort = 2;
+
+    protected int|string|array $columnSpan = 'full';
+
+    protected ?string $heading = 'حجم السجلات اليومي (آخر 14 يومًا)';
+
+    protected ?string $maxHeight = '260px';
+
+    protected function getData(): array
+    {
+        $user = auth()->user();
+
+        /** @var list<array{day: string, severity: string, total: int}> $rows */
+        $rows = Cache::remember('dashboard:volume:'.$user->id, 300, fn () => AuditLog::query()
+            ->where('occurred_at', '>=', now()->utc()->subDays(13)->startOfDay())
+            ->selectRaw('DATE(occurred_at) AS day, severity, COUNT(*) AS total')
+            ->groupBy('day', 'severity')
+            ->toBase()
+            ->get()
+            ->map(fn (object $r) => ['day' => (string) $r->day, 'severity' => (string) $r->severity, 'total' => (int) $r->total])
+            ->all());
+
+        $days = collect(range(13, 0))->map(fn ($i) => now()->utc()->subDays($i)->toDateString());
+        $series = fn (string $severity) => $days->map(fn ($d) => collect($rows)->where('day', $d)->where('severity', $severity)->sum('total'))->all();
+
+        return [
+            'datasets' => [
+                ['label' => 'info', 'data' => $series('info'), 'backgroundColor' => '#10b981', 'stack' => 's'],
+                ['label' => 'warning', 'data' => $series('warning'), 'backgroundColor' => '#f59e0b', 'stack' => 's'],
+                ['label' => 'critical', 'data' => $series('critical'), 'backgroundColor' => '#e11d48', 'stack' => 's'],
+            ],
+            'labels' => $days->map(fn ($d) => Carbon::parse($d)->format('m-d'))->all(),
+        ];
+    }
+
+    protected function getType(): string
+    {
+        return 'bar';
+    }
+
+    protected function getOptions(): array
+    {
+        return ['scales' => ['x' => ['stacked' => true], 'y' => ['stacked' => true, 'beginAtZero' => true]]];
+    }
+}

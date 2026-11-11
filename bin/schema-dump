@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Writes the reference schema (plan §4 / §15) to database/schema/schema.sql:
+# tables, partitions and triggers, without data and without AUTO_INCREMENT
+# counters, so the file only changes when the schema really changes.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+mkdir -p database/schema
+out=database/schema/schema.sql
+
+docker compose exec -T mariadb sh -c \
+    'mariadb-dump --no-data --triggers --routines --skip-comments --skip-dump-date \
+        -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' \
+    | sed -E 's/ AUTO_INCREMENT=[0-9]+//' > "$out"
+
+echo "Schema written to $out"

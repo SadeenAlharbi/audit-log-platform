@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Runs every check of the project and saves the full output to
+# storage/logs/doctor.log, so problems can be diagnosed from one file.
+#
+#   ./bin/doctor
+set -uo pipefail
+cd "$(dirname "$0")/.."
+
+LOG=storage/logs/doctor.log
+mkdir -p storage/logs
+: > "$LOG"
+
+step() {
+    local title="$1"; shift
+    echo "" | tee -a "$LOG"
+    echo "==================== $title ====================" | tee -a "$LOG"
+    echo "\$ $*" >> "$LOG"
+    "$@" 2>&1 | tee -a "$LOG"
+    local code=${PIPESTATUS[0]}
+    echo "[exit code: $code]" | tee -a "$LOG"
+    return 0
+}
+
+{
+    echo "doctor run: $(date -u +%FT%TZ)"
+    echo "git: $(git log --oneline -1 2>/dev/null)"
+    docker version --format 'docker client {{.Client.Version}} / server {{.Server.Version}}' 2>&1
+    docker compose version 2>&1
+} | tee -a "$LOG"
+
+if [ ! -f .env ]; then
+    cp .env.docker.example .env
+    echo "created .env from .env.docker.example" | tee -a "$LOG"
+fi
+
+if [ ! -f vendor/autoload.php ]; then
+    step "composer install" docker compose run --rm --no-deps --entrypoint composer app install --no-interaction --prefer-dist
+fi
+
+step "build" docker compose build
+step "up" docker compose up -d --wait --wait-timeout 300
+step "status" docker compose ps -a
+
+if ! grep -qE '^APP_KEY=.+' .env; then
+    step "key:generate" docker compose exec -T app php artisan key:generate --force
+fi
+
+step "about" docker compose exec -T app php artisan about --only=environment,drivers
+step "migrate:fresh --seed" docker compose exec -T app php artisan migrate:fresh --seed --force
+step "partitions" docker compose exec -T app php artisan audit:partitions
+step "tests" docker compose exec -T app php artisan test
+step "pint" docker compose exec -T app ./vendor/bin/pint --test
+step "phpstan" docker compose exec -T app ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress --error-format=raw
+step "http /" curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:$(grep -E '^APP_PORT=' .env | cut -d= -f2)/"
+
+step "app logs" docker compose logs --tail=80 app
+step "queue-worker logs" docker compose logs --tail=40 queue-worker
+step "scheduler logs" docker compose logs --tail=40 scheduler
+step "mariadb logs" docker compose logs --tail=60 mariadb
+
+echo ""
+echo "Full report saved to $LOG"

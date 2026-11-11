@@ -3,11 +3,16 @@
 namespace App\Services\Ingestion;
 
 use App\Models\ProjectApiKey;
+use App\Services\Security\SensitiveDataMasker;
 use Carbon\CarbonImmutable;
 
 /**
  * Turns a validated payload into an audit_logs row (plain scalars and JSON
  * strings) that can be queued and inserted as-is.
+ *
+ * Credentials and payment secrets (config audit.masking.never_store) are
+ * redacted here, before the row reaches the queue, the database, the
+ * archive or a backup (decision D8).
  */
 final class LogNormalizer
 {
@@ -19,6 +24,8 @@ final class LogNormalizer
      */
     public static function toRow(array $data, ProjectApiKey $key, string $uid, CarbonImmutable $receivedAt, ?int $batchId = null): array
     {
+        $redactor = SensitiveDataMasker::forStorage();
+
         return [
             'uid' => $uid,
             'project_id' => $key->project_id,
@@ -35,9 +42,9 @@ final class LogNormalizer
             'user_agent' => self::str($data['actor']['user_agent'] ?? null),
             'subject_type' => self::str($data['subject']['type'] ?? null),
             'subject_id' => self::str($data['subject']['id'] ?? null),
-            'old_values' => self::json($data['old_values'] ?? null),
-            'new_values' => self::json($data['new_values'] ?? null),
-            'metadata' => self::json($data['metadata'] ?? null),
+            'old_values' => self::json($redactor->mask($data['old_values'] ?? null)),
+            'new_values' => self::json($redactor->mask($data['new_values'] ?? null)),
+            'metadata' => self::json($redactor->mask($data['metadata'] ?? null)),
             'tags' => self::json(isset($data['tags']) ? array_values(array_unique($data['tags'])) : null),
             'request_id' => self::str($data['request_id'] ?? null),
             'correlation_id' => self::str($data['correlation_id'] ?? null),

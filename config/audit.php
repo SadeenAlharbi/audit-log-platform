@@ -103,18 +103,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Masking (plan §7): values of these keys are replaced in old_values /
-    | new_values / metadata when shown, unless the viewer has
-    | logs.view_sensitive. Matching is case-insensitive and also matches keys
-    | that contain the word (e.g. "user_password", "accessToken").
+    | Masking (plan §7, decision D8). Matching is case-insensitive and also
+    | matches keys that contain the word ("user_password", "accessToken").
+    |
+    | never_store: credentials and payment secrets. Replaced at ingestion,
+    |   before anything is written, so they exist nowhere on the platform
+    |   (not in the database, the archive or the backups). Not revealable.
+    | keys: personal data masked whenever logs are shown, exported or
+    |   returned by the API; revealed only to holders of logs.view_sensitive.
+    |   (never_store keys are masked on display too.)
     |--------------------------------------------------------------------------
     */
     'masking' => [
         'replacement' => '********',
-        'keys' => [
+        'redacted' => '[REDACTED]',
+        'never_store' => [
             'password', 'passwd', 'secret', 'token', 'api_key', 'apikey',
-            'authorization', 'card_number', 'cardnumber', 'cvv', 'cvc', 'pin',
-            'iban', 'ssn', 'national_id', 'private_key', 'otp',
+            'authorization', 'private_key', 'otp', 'pin',
+            'card_number', 'cardnumber', 'pan', 'cvv', 'cvc',
+        ],
+        'keys' => [
+            'iban', 'ssn', 'national_id', 'nationalid', 'iqama', 'passport',
+            'date_of_birth', 'dob',
         ],
     ],
 

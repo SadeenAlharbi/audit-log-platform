@@ -1,11 +1,11 @@
 # Audit Log Platform - local / dev stack.
 #
-#   cp .env.docker.example .env   (bin/setup does this for you)
-#   docker compose up -d
-#   docker compose exec app php artisan migrate --seed
+#   ./bin/setup                      first run (build, install, migrate, seed)
+#   docker compose up -d             afterwards
 #
-# Services: app (PHP-FPM), nginx, mariadb, redis, queue-worker, scheduler,
-# backup (enabled with: docker compose --profile backup up -d).
+# Services: app (PHP-FPM), nginx, mariadb, redis, queue-worker (Horizon),
+# scheduler, backup (mariadb-backup + age + rclone) and minio (S3-compatible
+# off-site storage for the archive and the backups in development).
 
 name: audit-log-platform
 
@@ -97,17 +97,20 @@ services:
 
   queue-worker:
     <<: *app
-    command: ["php", "artisan", "queue:work", "redis", "--queue=ingest,default", "--tries=5", "--backoff=10", "--max-time=3600"]
+    # Horizon supervises the ingest/default/maintenance workers (config/horizon.php).
+    command: ["php", "artisan", "horizon"]
+    stop_grace_period: 60s
     environment:
       CONTAINER_ROLE: worker
     depends_on:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "php artisan horizon:status | grep -qi running"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
+      start_period: 30s
 
   scheduler:
     <<: *app
@@ -124,30 +127,74 @@ services:
       retries: 3
 
   backup:
-    image: mariadb:11.8
-    profiles: ["backup"]
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    image: audit-log-platform/backup:${APP_IMAGE_TAG:-dev}
     restart: unless-stopped
-    entrypoint: ["/usr/local/bin/backup.sh"]
     command: ["schedule"]
     environment:
       DB_HOST: mariadb
+      DB_NAME: ${DB_DATABASE}
       DB_BACKUP_USERNAME: ${DB_BACKUP_USERNAME}
       DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD}
       FULL_BACKUP_HOUR: ${BACKUP_FULL_HOUR:-2}
+      RESTORE_TEST_WEEKDAY: ${BACKUP_RESTORE_TEST_WEEKDAY:-5}
+      AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+      # rclone remote "offsite" defined from environment variables (MinIO in dev, S3 in prod).
+      RCLONE_CONFIG_OFFSITE_TYPE: s3
+      RCLONE_CONFIG_OFFSITE_PROVIDER: ${BACKUP_S3_PROVIDER:-Minio}
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      RCLONE_CONFIG_OFFSITE_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: ${AWS_ENDPOINT:-}
     volumes:
       - mariadb-data:/var/lib/mysql:ro
       - backups:/backups
-      - ./docker/backup/backup.sh:/usr/local/bin/backup.sh:ro
+      # Shared with the app: manual run requests in, status + reports out.
+      - ./storage/app/backup-spool:/spool
     depends_on:
       mariadb:
         condition: service_healthy
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minio}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-change-me-minio}
+    ports:
+      - "127.0.0.1:${FORWARD_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "grep -q backup.sh /proc/1/cmdline || exit 1"]
-      interval: 60s
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 10
+
+  # One-shot: creates the archive and backup buckets (versioned, so an
+  # overwritten or deleted object can still be recovered).
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MC_HOST_local: http://${AWS_ACCESS_KEY_ID:-minio}:${AWS_SECRET_ACCESS_KEY:-change-me-minio}@minio:9000
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc mb --ignore-existing local/${AUDIT_ARCHIVE_BUCKET:-audit-archive} &&
+        mc mb --ignore-existing local/${BACKUP_BUCKET:-audit-backups} &&
+        mc version enable local/${AUDIT_ARCHIVE_BUCKET:-audit-archive} &&
+        mc version enable local/${BACKUP_BUCKET:-audit-backups}
 
 volumes:
   mariadb-data:
   redis-data:
   backups:
+  minio-data:

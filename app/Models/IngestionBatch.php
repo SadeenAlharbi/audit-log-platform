@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -35,6 +36,15 @@ class IngestionBatch extends Model
     public function uniqueIds(): array
     {
         return ['uid'];
+    }
+
+    /**
+     * Canonical upper-case ULID, like the log uids (Laravel's default is
+     * lower-case), so every id in the API has one format.
+     */
+    public function newUniqueId(): string
+    {
+        return (string) Str::ulid();
     }
 
     protected function casts(): array

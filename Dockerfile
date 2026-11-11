@@ -30,7 +30,7 @@ FROM php:${PHP_VERSION}-fpm-bookworm AS base
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git unzip libzip-dev libicu-dev libfcgi-bin procps mariadb-client \
+        git unzip libzip-dev libicu-dev libfcgi-bin procps mariadb-client age \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql intl bcmath zip opcache pcntl \
     && pecl install redis \
     && docker-php-ext-enable redis \
@@ -56,6 +56,8 @@ CMD ["php-fpm"]
 ############################
 FROM base AS dev
 COPY docker/php/conf.d/opcache-dev.ini "$PHP_INI_DIR/conf.d/zz-opcache.ini"
+# pcov: code coverage for `php artisan test --coverage` (CI gate: API >= 80%).
+RUN pecl install pcov && docker-php-ext-enable pcov && rm -rf /tmp/pear
 
 ############################
 # prod: immutable image

@@ -84,6 +84,14 @@ return [
             ]) : [],
         ],
 
+        // Development only: Laravel Telescope storage (config/telescope.php).
+        'telescope' => [
+            'driver' => 'sqlite',
+            'database' => env('TELESCOPE_DB_DATABASE', storage_path('telescope/telescope.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ],
+
         // Used only by the archive/prune jobs. The append-only triggers on
         // audit_logs / ingestion_keys allow DELETE for this account and no other.
         'archiver' => [

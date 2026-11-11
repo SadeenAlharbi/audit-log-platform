@@ -33,8 +33,30 @@ it('accepts a log with 202 and stores it through the queue', function () {
         ->tags->toBe(['billing'])
         ->correlation_id->toBe('corr-1');
 
-    // Stored as received: masking happens when logs are shown.
-    expect($log->new_values['password'])->toBe('secret-value');
+    // D8: credentials are redacted before storage; they exist nowhere.
+    expect($log->new_values['password'])->toBe('[REDACTED]')
+        ->and($log->new_values['status'])->toBe('paid');
+});
+
+it('redacts never-store keys at any depth but keeps personal data for authorised viewers', function () {
+    $uid = sendApi($this, $this->issued, 'POST', '/api/v1/logs', logPayload([
+        'new_values' => [
+            'card' => ['cardNumber' => '4111111111111111', 'cvv' => '123'],
+            'accessToken' => 'tok',
+            'national_id' => '1234567890',
+            'shipping_address' => 'Riyadh',
+        ],
+        'metadata' => ['headers' => ['Authorization' => 'Bearer x']],
+    ]))->assertStatus(202)->json('data.uid');
+
+    $log = AuditLog::query()->withoutGlobalScopes()->where('uid', $uid)->firstOrFail();
+
+    expect($log->new_values)->toBe([
+        'card' => ['cardNumber' => '[REDACTED]', 'cvv' => '[REDACTED]'],
+        'accessToken' => '[REDACTED]',
+        'national_id' => '1234567890',
+        'shipping_address' => 'Riyadh',
+    ])->and($log->metadata['headers']['Authorization'])->toBe('[REDACTED]');
 });
 
 it('answers before storing: the log is only queued', function () {
@@ -133,6 +155,10 @@ it('accepts a batch with valid, invalid and duplicate items', function () {
         ->assertJsonPath('data.items.2.status', 'duplicate')
         ->assertJsonPath('data.items.3.status', 'duplicate')
         ->assertJsonPath('data.items.3.uid', $response->json('data.items.0.uid'));
+
+    // Every id in the API is a canonical (upper-case) ULID, as in the OpenAPI.
+    expect($response->json('data.batch_uid'))->toMatch('/^[0-9A-HJKMNP-TV-Z]{26}$/')
+        ->and($response->json('data.items.0.uid'))->toMatch('/^[0-9A-HJKMNP-TV-Z]{26}$/');
 
     $batch = IngestionBatch::query()->where('uid', $response->json('data.batch_uid'))->firstOrFail();
     expect($batch)->status->toBe('partially_failed')->accepted_count->toBe(2)->rejected_count->toBe(1);

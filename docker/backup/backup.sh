@@ -141,7 +141,7 @@ run_binlogs() {
     mariadb "${conn[@]}" -e "FLUSH BINARY LOGS" >/dev/null 2>&1 || log "warning: FLUSH BINARY LOGS failed"
     local current; current="$(mariadb "${conn[@]}" -N -e "SHOW MASTER STATUS" 2>/dev/null | awk '{print $1}')"
     local copied=0 total=0
-    for f in "$DATADIR"/mariadb-bin.[0-9]*; do
+    for f in "$DATADIR"/mariadb-bin.[0-9][0-9][0-9][0-9][0-9][0-9]; do  # not the .idx GTID index files
         [ -e "$f" ] || continue
         local name; name="$(basename "$f")"
         [ "$name" = "$current" ] && continue
@@ -182,16 +182,23 @@ run_restore_test() {
     while read -r inc; do chain+=("$inc"); done < <(ls -1d "$BACKUP_ROOT"/incremental/* 2>/dev/null | sort | awk -v f="$(basename "$full")" -F/ '$NF > f')
 
     log "restore test: ${#chain[@]} backup(s) from $(basename "$full")"
+    # Work on copies only: "--prepare --incremental-dir" consumes (moves) the
+    # .delta files of the incremental directory, which would destroy the
+    # local backup chain.
     cp -a "$full" "$work/data"
     if ! mariadb-backup --prepare --target-dir="$work/data" > "$work/prepare.log" 2>&1; then
         write_status restore_test failed "$started" "" "" "" "prepare failed: $(tail -n 3 "$work/prepare.log")" "{}"
         return 1
     fi
+    local n=0
     for inc in "${chain[@]:1}"; do
-        if ! mariadb-backup --prepare --target-dir="$work/data" --incremental-dir="$inc" >> "$work/prepare.log" 2>&1; then
+        n=$((n + 1))
+        cp -a "$inc" "$work/inc-$n"
+        if ! mariadb-backup --prepare --target-dir="$work/data" --incremental-dir="$work/inc-$n" >> "$work/prepare.log" 2>&1; then
             write_status restore_test failed "$started" "" "" "" "incremental prepare failed for $(basename "$inc")" "{}"
             return 1
         fi
+        rm -rf "$work/inc-$n"
     done
 
     # shellcheck disable=SC2086
@@ -205,22 +212,25 @@ run_restore_test() {
         return 1
     fi
 
-    local bad tables rows max_id expected partitions
-    bad="$("${q[@]}" -e "SELECT GROUP_CONCAT(t) FROM (SELECT TABLE_NAME t FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB_NAME') x" 2>/dev/null)"
-    tables="$(tr ',' ' ' <<< "$bad")"
+    local names tables rows max_id expected partitions
+    names="$("${q[@]}" -e "SELECT GROUP_CONCAT(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB_NAME'" 2>/dev/null || true)"
+    tables="$(tr ',' ' ' <<< "$names")"
     local failed_checks=""
     for t in $tables; do
-        local res; res="$("${q[@]}" -e "CHECK TABLE \`$t\`" | awk '{print $NF}' | tail -n1)"
+        local res; res="$("${q[@]}" -e "CHECK TABLE \`$t\`" 2>/dev/null | awk '{print $NF}' | tail -n1 || true)"
+        [ -n "$res" ] || res="unreadable"
         [ "$res" = "OK" ] || failed_checks="$failed_checks $t($res)"
     done
-    rows="$("${q[@]}" -e 'SELECT COUNT(*) FROM audit_logs')"
-    max_id="$("${q[@]}" -e 'SELECT COALESCE(MAX(id),0) FROM audit_logs')"
-    partitions="$("${q[@]}" -e "SELECT COUNT(*) FROM information_schema.PARTITIONS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='audit_logs'")"
+    # A broken restore must produce a "failed" report, not stop the script.
+    rows="$("${q[@]}" -e 'SELECT COUNT(*) FROM audit_logs' 2>"$work/query.err" || echo -1)"
+    max_id="$("${q[@]}" -e 'SELECT COALESCE(MAX(id),0) FROM audit_logs' 2>>"$work/query.err" || echo -1)"
+    partitions="$("${q[@]}" -e "SELECT COUNT(*) FROM information_schema.PARTITIONS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='audit_logs'" 2>>"$work/query.err" || echo -1)"
     expected="$(jq -r '.max_audit_id' "${chain[-1]}/audit-meta.json")"
     local seconds=$(( $(date +%s) - t0 ))
 
     local status=succeeded error=""
     [ -n "$failed_checks" ] && { status=failed; error="CHECK TABLE failed:$failed_checks"; }
+    [ "$rows" -lt 0 ] && { status=failed; error="${error:+$error; }audit_logs unreadable: $(head -c 300 "$work/query.err")"; }
     [ "$max_id" -lt "$expected" ] && { status=failed; error="${error:+$error; }restored max(id) $max_id < $expected recorded at backup time"; }
 
     cat > "$report" <<MD

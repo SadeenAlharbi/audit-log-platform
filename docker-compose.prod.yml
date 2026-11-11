@@ -1,0 +1,62 @@
+# Production overrides (docs/runbook.md, "Deployment"):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences from development:
+#   * immutable images (target prod / web), no source bind mount
+#   * configuration from .env injected as environment (no .env in the image)
+#   * storage and the backup spool on named volumes
+#   * nginx listens on 127.0.0.1 only: TLS terminates on the reverse proxy /
+#     load balancer in front (set TRUSTED_PROXIES); HTTPS is enforced by the API
+#   * no database port on the host, no MinIO (real S3 / MinIO cluster off-server)
+
+x-prod-app: &prod-app
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: prod
+  image: ${APP_IMAGE:-audit-log-platform/app}:${APP_IMAGE_TAG:-latest}
+  env_file: .env
+  volumes: !override
+    - app-storage:/var/www/html/storage
+    - backup-spool:/var/www/html/storage/app/backup-spool
+
+services:
+  app:
+    <<: *prod-app
+
+  queue-worker:
+    <<: *prod-app
+
+  scheduler:
+    <<: *prod-app
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    image: ${WEB_IMAGE:-audit-log-platform/web}:${APP_IMAGE_TAG:-latest}
+    volumes: !reset []
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-8080}:80"
+
+  mariadb:
+    ports: !reset []
+
+  backup:
+    volumes: !override
+      - mariadb-data:/var/lib/mysql:ro
+      - backups:/backups
+      - backup-spool:/spool
+
+  minio:
+    profiles: ["dev-only"]
+
+  minio-init:
+    profiles: ["dev-only"]
+
+volumes:
+  app-storage:
+  backup-spool:

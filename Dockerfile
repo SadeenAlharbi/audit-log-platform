@@ -73,6 +73,15 @@ COPY --from=assets /app/public/build ./public/build
 
 RUN composer dump-autoload --optimize --classmap-authoritative --no-dev \
     && php artisan package:discover --ansi \
+    && mkdir -p storage/app/backup-spool storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
     && chown -R www-data:www-data storage bootstrap/cache
 
 USER www-data
+
+############################
+# web: nginx with the public assets of the prod image (production only;
+# in development nginx mounts ./public instead)
+############################
+FROM nginx:1.27-alpine AS web
+COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=prod /var/www/html/public /var/www/html/public

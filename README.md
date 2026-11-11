@@ -1,71 +1,110 @@
-# Audit Log Hub - منصة Audit Log المركزية
+# Audit Log Hub · منصة Audit Log المركزية
 
-منصة مركزية تستقبل سجلات التدقيق من أنظمة الشركة عبر REST API، وتحفظها بشكل غير قابل للتعديل، مع لوحة تحكم Filament.
+منصة مركزية تستقبل سجلات التدقيق من كل أنظمة الشركة عبر REST API، وتحفظها بشكل **غير قابل للتعديل أو الحذف**، مع فصل كامل لبيانات كل مشروع، ولوحة تحكم عربية (Filament 5) للبحث والتصدير والإدارة.
 
-**التقنيات:** Laravel 13 · PHP 8.4 · Filament 5 · MariaDB 11.8 · Redis · Node 24 · Docker
+**التقنيات:** Laravel 13 · PHP 8.4 · Filament 5 · MariaDB 11.8 · Redis · Horizon · Node 24 · Docker
 
-## التشغيل لأول مرة
+---
 
-المتطلب الوحيد على الجهاز هو Docker Desktop.
+## التشغيل
 
-```bash
-./bin/setup        # أو: make setup
-```
-
-السكربت يقوم بالآتي:
-1. ينسخ `.env.docker.example` إلى `.env`.
-2. يبني الصور ويشغّل الخدمات.
-3. ينتظر تثبيت الحزم (`composer install` يتم تلقائيًا في أول تشغيل).
-4. يولّد `APP_KEY`.
-5. يشغّل `migrate --seed`.
-
-لإنشاء أول Super Admin، عبّئ `ADMIN_EMAIL` و`ADMIN_PASSWORD` في `.env` قبل التشغيل، أو بعده ثم شغّل `make seed`.
-
-التشغيل اليدوي بأمر واحد (plan §3):
+المتطلب الوحيد على الجهاز: **Docker Desktop**.
 
 ```bash
-docker compose up -d && docker compose exec app php artisan migrate --seed
+./bin/setup
 ```
 
-## الخدمات
+السكربت آمن لإعادة التشغيل، ويقوم بالآتي:
+1. ينشئ `.env` بكلمات مرور عشوائية.
+2. يبني الصور ويثبّت الحزم.
+3. يولّد مفتاح تشفير النسخ الاحتياطية (age).
+4. يشغّل الخدمات وينفّذ `migrate --seed`.
+
+لإنشاء أول Super Admin: عبّئ `ADMIN_EMAIL` و`ADMIN_PASSWORD` في `.env` ثم شغّل `make seed`. عند أول دخول يُطلب منك تفعيل المصادقة الثنائية (تطبيق Authenticator).
+
+بعد ذلك يكفي `docker compose up -d`.
+
+| الرابط | الوصف |
+|---|---|
+| http://localhost:8080/admin | لوحة التحكم |
+| http://localhost:8080/api/v1 | الـ API ([التوثيق](http://localhost:8080/docs/api)) |
+| http://localhost:8080/horizon | مراقبة الطوابير (Super Admin) |
+| http://localhost:8080/telescope | Telescope (التطوير فقط) |
+| http://localhost:9001 | MinIO (الأرشيف والنسخ في التطوير) |
+
+### الخدمات
 
 | الخدمة | الدور |
 |---|---|
 | `app` | PHP 8.4-FPM |
-| `nginx` | الواجهة على `http://localhost:8080` |
-| `mariadb` | MariaDB 11.8، متاحة للجهاز على `127.0.0.1:33060` |
+| `nginx` | الواجهة على المنفذ 8080 |
+| `mariadb` | MariaDB 11.8 مع Binary Logs، ومتاحة على `127.0.0.1:33060` |
 | `redis` | الطوابير والكاش والجلسات والـ Rate limiting |
-| `queue-worker` | معالجة الطوابير (`ingest`, `default`) |
-| `scheduler` | المهام المجدولة |
-| `backup` | النسخ الاحتياطي (يُفعَّل بـ `docker compose --profile backup up -d`) |
+| `queue-worker` | Horizon: يخزّن السجلات المستلمة |
+| `scheduler` | المهام المجدولة: الأقسام، الأرشفة، الاحتفاظ، النسخ، التنبيهات |
+| `backup` | mariadb-backup كامل يوميًا وتزايدي كل ساعة، Binary Logs، تشفير age، رفع rclone، اختبار استعادة أسبوعي |
+| `minio` | تخزين متوافق مع S3 للأرشيف والنسخ في بيئة التطوير |
 
-## أوامر مفيدة
+### أوامر مفيدة
 
 ```bash
-make help         # كل الأوامر
-make ps           # حالة الخدمات والـ healthchecks
-make test         # الاختبارات (على قاعدة audit_testing)
-make fresh        # إعادة بناء المخطط من الصفر (قبل أول نشر فقط)
-make partitions   # عرض أقسام audit_logs وإضافة الأشهر القادمة
-make schema-dump  # توليد database/schema/schema.sql
+make help        # كل الأوامر
+make ps          # حالة الخدمات والـ healthchecks
+make test        # الاختبارات (قاعدة audit_testing)
+make lint        # Pint
+make analyse     # PHPStan / Larastan مستوى 6
+./bin/doctor     # فحص شامل، والتقرير في storage/logs/doctor.log
+make partitions  # أقسام audit_logs
+make schema-dump # تحديث database/schema/schema.sql
 ```
+
+---
+
+## ربط نظام بالمنصة (باختصار)
+
+1. من اللوحة: **المشاريع ← إنشاء**. يُنشأ الـ slug ومفتاح API، ويُعرض المفتاح **مرة واحدة فقط**.
+2. أرسل السجلات:
+
+```bash
+curl -X POST https://audit.example.com/api/v1/logs \
+  -H "Authorization: Bearer $AUDIT_API_KEY" -H "X-Project: erp" \
+  -H "Content-Type: application/json" \
+  -d '{"external_id":"order-1001-paid","event":"order.paid","action":"update",
+       "occurred_at":"2026-11-11T10:00:00Z","subject":{"type":"order","id":"1001"},
+       "old_values":{"status":"pending"},"new_values":{"status":"paid"}}'
+```
+
+3. مشاريع Laravel تستخدم الحزمة `company/audit-client` (ريبو مستقل).
+
+التفاصيل الكاملة: [docs/integration-guide.md](docs/integration-guide.md). العقد الرسمي: [docs/openapi.yaml](docs/openapi.yaml).
+
+---
 
 ## الوثائق
 
-- [docs/schema.md](docs/schema.md): المخطط، الـ ERD، وقائمة مراجعة التجميد
-- [docs/decisions.md](docs/decisions.md): القرارات التقنية وأسبابها
+| الوثيقة | المحتوى |
+|---|---|
+| [docs/integration-guide.md](docs/integration-guide.md) | دليل الربط: المصادقة، التوقيع، الأمثلة (cURL / PHP / Node / Python / Laravel)، الأخطاء |
+| [docs/openapi.yaml](docs/openapi.yaml) | عقد الـ API (OpenAPI 3.1)، ويُعرض في `/docs/api` |
+| [docs/runbook.md](docs/runbook.md) | دليل التشغيل: النشر، النسخ، الاستعادة الكاملة والجزئية، تدوير المفاتيح، الحوادث |
+| [docs/permissions-matrix.md](docs/permissions-matrix.md) | مصفوفة الأدوار والصلاحيات، وهي مختبرة آليًا |
+| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) | المخطط والـ ERD |
+| [docs/decisions.md](docs/decisions.md) | القرارات التقنية وأسبابها |
+| [docs/security-review.md](docs/security-review.md) | المراجعة الأمنية النهائية |
+| [docs/plan-compliance.md](docs/plan-compliance.md) | كل متطلب في وثيقة الخطة، وأين نُفّذ، وكيف اختُبر |
+| [docs/reports/](docs/reports/) | تقارير اختبار الاستعادة |
 
-## سياسة الـ Migrations (إلزامية)
+---
+
+## الجودة
+
+- **Pest:** 146 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
+- **التغطية:** طبقة الـ API فوق 90% (الحد الأدنى 80%، ويفرضه `bin/coverage-api` في CI).
+- **Pint + PHPStan مستوى 6:** بدون أخطاء.
+- **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml)، يشغّل كل الفحوص داخل Docker، ويبني صور الإنتاج، ويفحص ملف OpenAPI.
+
+## سياسة الـ Migrations
 
 - Migration واحد لكل جدول، يحتوي الأعمدة والفهارس والقيود والـ Triggers كاملة.
-- **قبل أول نشر:** لا يُضاف Migration من نوع `alter` أو `add_column` أو `rename`. أي تعديل يتم في ملف الجدول الأصلي ثم `make fresh`.
-- **بعد أول نشر:** تُقبل Migrations إضافية فقط، بشرط أن تكون قابلة للتراجع وأن يكون `down()` مكتوبًا ومختبرًا.
-
-## خطة التسليم
-
-| الأسبوع | المخرجات | الحالة |
-|---|---|---|
-| 1 | Docker، Laravel 13، MariaDB، المخطط، Migrations، Models، التقسيم | جاهز للمراجعة |
-| 2 | الـ API (ingest + query)، المصادقة، الحماية، الاختبارات | |
-| 3 | Filament: Projects, API Keys, Logs, Dashboard, Users, Roles | |
-| 4 | النسخ والأرشفة، التوثيق، حزمة `audit-client`، CI، المراجعة الأمنية | |
+- **قبل أول نشر:** يُعدَّل ملف الجدول الأصلي ثم يُشغَّل `make fresh`، ولا تُضاف Migrations من نوع alter.
+- **بعد أول نشر:** تُقبل Migrations إضافية فقط، قابلة للتراجع، مع `down()` مختبر.

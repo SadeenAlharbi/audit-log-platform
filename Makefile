@@ -51,6 +51,6 @@ doctor: ## Run every check and save the report to storage/logs/doctor.log
 	./bin/doctor
 
 backup-full: ## Take a full database backup now
-	$(COMPOSE) --profile backup run --rm backup full
+	$(COMPOSE) run --rm backup full
 
 .PHONY: help setup up down ps logs shell migrate fresh seed partitions test lint analyse schema-dump doctor backup-full

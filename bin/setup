@@ -26,7 +26,7 @@ set_env() { # set_env KEY VALUE  (replaces the line in .env)
 if [ ! -f .env ]; then
     say "Creating .env with random secrets"
     cp .env.docker.example .env
-    for key in DB_PASSWORD DB_MAINTENANCE_PASSWORD DB_ROOT_PASSWORD DB_ARCHIVER_PASSWORD DB_BACKUP_PASSWORD AWS_SECRET_ACCESS_KEY; do
+    for key in DB_PASSWORD DB_MAINTENANCE_PASSWORD DB_ROOT_PASSWORD DB_ARCHIVER_PASSWORD DB_BACKUP_PASSWORD; do
         if grep -qE "^${key}=change-me" .env; then
             set_env "$key" "$(openssl rand -hex 24)"
         fi
@@ -46,6 +46,20 @@ while IFS= read -r line; do
     added="$added $key"
 done < .env.docker.example
 [ -n "$added" ] && echo "Added to .env:$added"
+
+# The development MinIO service was removed (MinIO no longer publishes its
+# images): an .env still pointing at it is switched to local storage.
+if grep -qE '^AWS_ENDPOINT=http://minio:9000' .env; then
+    set_env AUDIT_ARCHIVE_DRIVER local
+    set_env BACKUP_DRIVER local
+    set_env BACKUP_RCLONE_REMOTE ""
+    set_env AWS_ENDPOINT ""
+    set_env AWS_ACCESS_KEY_ID ""
+    set_env AWS_SECRET_ACCESS_KEY ""
+    set_env AWS_USE_PATH_STYLE_ENDPOINT false
+    set_env BACKUP_S3_PROVIDER AWS
+    echo "Switched archive and backups to local storage (MinIO removed from development)."
+fi
 
 if grep -qE '^ADMIN_EMAIL=$' .env; then
     warn "Tip: set ADMIN_EMAIL and ADMIN_PASSWORD in .env to create the first Super Admin (then run: make seed)."
@@ -129,7 +143,6 @@ cat <<EOF
   Dashboard : http://localhost:${port:-8080}/admin
   API       : http://localhost:${port:-8080}/api/v1  (docs: /docs/api)
   Horizon   : http://localhost:${port:-8080}/horizon
-  MinIO     : http://localhost:9001  (user: minio, password: AWS_SECRET_ACCESS_KEY in .env)
 
   Run the checks : ./bin/doctor     Run the tests : make test
 EOF

@@ -9,7 +9,7 @@
 #   * storage and the backup spool on named volumes
 #   * nginx listens on 127.0.0.1 only: TLS terminates on the reverse proxy /
 #     load balancer in front (set TRUSTED_PROXIES); HTTPS is enforced by the API
-#   * no database port on the host, no MinIO (real S3 / MinIO cluster off-server)
+#   * no database port on the host, archive and backups on real off-server S3
 
 x-prod-app: &prod-app
   build:
@@ -51,11 +51,6 @@ services:
       - backups:/backups
       - backup-spool:/spool
 
-  minio:
-    profiles: ["dev-only"]
-
-  minio-init:
-    profiles: ["dev-only"]
 
 volumes:
   app-storage:

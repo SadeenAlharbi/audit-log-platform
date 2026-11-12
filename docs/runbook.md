@@ -42,7 +42,7 @@ cp .env.docker.example .env
 | `LOG_LEVEL` | `info` |
 | `TELESCOPE_ENABLED` | `false` (الحزمة غير موجودة أصلًا في صورة الإنتاج) |
 | `DB_*_PASSWORD`, `AWS_SECRET_ACCESS_KEY` | أسرار عشوائية قوية: `openssl rand -hex 24` |
-| `AWS_*`, `AUDIT_ARCHIVE_*`, `BACKUP_*` | بيانات الـ bucket الحقيقي. `BACKUP_S3_PROVIDER=AWS` لـ S3، و`AWS_USE_PATH_STYLE_ENDPOINT=false` |
+| `AWS_*`, `AUDIT_ARCHIVE_*`, `BACKUP_*` | بيانات الـ bucket الحقيقي، مع `AUDIT_ARCHIVE_DRIVER=s3` و`BACKUP_DRIVER=s3` و`BACKUP_RCLONE_REMOTE=offsite:<bucket>`. `BACKUP_S3_PROVIDER=AWS` لـ S3، و`AWS_USE_PATH_STYLE_ENDPOINT=false`. (في التطوير القيم محلية افتراضيًا) |
 | `BACKUP_AGE_RECIPIENT` | المفتاح العام للتشفير (انظر 1.3) |
 | `ALERT_MAIL_TO`, `ALERT_SLACK_WEBHOOK_URL`, `MAIL_*` | قنوات التنبيه |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | أول Super Admin. احذفهما من `.env` بعد أول seed |

@@ -35,7 +35,6 @@
 | http://localhost:8080/api/v1 | الـ API ([التوثيق](http://localhost:8080/docs/api)) |
 | http://localhost:8080/horizon | مراقبة الطوابير (Super Admin) |
 | http://localhost:8080/telescope | Telescope (التطوير فقط) |
-| http://localhost:9001 | MinIO (الأرشيف والنسخ في التطوير) |
 
 ### الخدمات
 
@@ -47,8 +46,9 @@
 | `redis` | الطوابير والكاش والجلسات والـ Rate limiting |
 | `queue-worker` | Horizon: يخزّن السجلات المستلمة |
 | `scheduler` | المهام المجدولة: الأقسام، الأرشفة، الاحتفاظ، النسخ، التنبيهات |
-| `backup` | mariadb-backup كامل يوميًا وتزايدي كل ساعة، Binary Logs، تشفير age، رفع rclone، اختبار استعادة أسبوعي |
-| `minio` | تخزين متوافق مع S3 للأرشيف والنسخ في بيئة التطوير |
+| `backup` | mariadb-backup كامل يوميًا وتزايدي كل ساعة، Binary Logs، تشفير age، رفع rclone (في الإنتاج)، اختبار استعادة أسبوعي |
+
+> في التطوير يُحفظ الأرشيف والنسخ محليًا (`storage/app/archive` و`storage/app/backups` وvolume `backups`). في الإنتاج تُوجَّه إلى S3 خارج الخادم (Runbook §1).
 
 ### أوامر مفيدة
 

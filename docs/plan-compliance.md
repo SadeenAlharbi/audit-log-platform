@@ -15,7 +15,7 @@
 
 | المتطلب | الحالة | الدليل |
 |---|---|---|
-| الخدمات: app، nginx، mariadb، redis، queue-worker، scheduler، backup | ✓ | `docker-compose.yml`، ومعها minio للتطوير |
+| الخدمات: app، nginx، mariadb، redis، queue-worker، scheduler، backup | ✓ | `docker-compose.yml` (التخزين الخارجي S3 في الإنتاج، ومحلي في التطوير) |
 | Dockerfile متعدد المراحل dev/prod، الإضافات pdo_mysql/redis/intl/bcmath/zip/opcache، وأصول بـ node:24-alpine | ✓ | `Dockerfile` (assets / base / dev / prod / web) |
 | `.env.docker.example` | ✓ | فيه كل المتغيرات |
 | Volumes دائمة لـ MariaDB وRedis | ✓ | `mariadb-data` و`redis-data` |

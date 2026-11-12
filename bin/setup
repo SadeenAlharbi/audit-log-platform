@@ -49,7 +49,7 @@ done < .env.docker.example
 
 # The development MinIO service was removed (MinIO no longer publishes its
 # images): an .env still pointing at it is switched to local storage.
-if grep -qE '^AWS_ENDPOINT=http://minio:9000' .env; then
+if grep -qE '^(AWS_ENDPOINT=http://minio:9000|BACKUP_S3_PROVIDER=Minio)' .env; then
     set_env AUDIT_ARCHIVE_DRIVER local
     set_env BACKUP_DRIVER local
     set_env BACKUP_RCLONE_REMOTE ""

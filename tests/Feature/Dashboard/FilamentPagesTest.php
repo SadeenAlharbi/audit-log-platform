@@ -156,6 +156,22 @@ it('exports the filtered logs as CSV with masking', function () {
     expect(PlatformAudit::query()->where('action', 'logs.exported')->where('user_id', $viewer->id)->exists())->toBeTrue();
 });
 
+it('exports only the viewer\'s project and masks sensitive values (CSV and JSON)', function (string $format) {
+    $mine = Project::factory()->create();
+    $other = Project::factory()->create();
+    makeAuditLog($mine, ['event' => 'mine.event', 'new_values' => ['iban' => 'SA4420000001234567891234', 'status' => 'paid']]);
+    makeAuditLog($other, ['event' => 'other.event', 'new_values' => ['status' => 'x']]);
+    $this->actingAs(projectUser($mine, 'project_viewer'));
+
+    $component = Livewire::test(ListAuditLogs::class)->callAction("export_{$format}");
+    $content = base64_decode((string) data_get($component->effects, 'download.content'));
+
+    expect($content)->toContain('mine.event')
+        ->and($content)->not->toContain('other.event')     // Global Scope applies to exports
+        ->and($content)->not->toContain('SA4420000001234567891234') // masked without logs.view_sensitive
+        ->and($content)->toContain('paid');
+})->with(['csv', 'json']);
+
 it('creates a user with platform roles', function () {
     $this->actingAs($this->admin);
 

@@ -9,6 +9,12 @@
 
 return [
 
+    // Dashboard identity (Platforms Code footer). The organisation name is
+    // optional: leave it empty and the footer shows the platform name only.
+    'branding' => [
+        'organization' => env('AUDIT_ORGANIZATION_NAME', ''),
+    ],
+
     'retention' => [
         // D3: platform-wide ceiling. No project may keep logs longer than this.
         // Monthly partitions that are entirely older than this are archived
@@ -186,6 +192,12 @@ return [
         // Rows newer than this are not archived yet (lets in-flight inserts commit).
         'settle_seconds' => 120,
         'chunk_size' => 5000,
+        // Plan §9 "soft archive": rows are deleted only once their archive
+        // run is at least this many days old (they stay queryable meanwhile).
+        'grace_days' => (int) env('AUDIT_ARCHIVE_GRACE_DAYS', 7),
+        // Logs restored from the archive are protected from the nightly
+        // prune for this many days (audit:restore-archive --hold-days).
+        'restore_hold_days' => (int) env('AUDIT_RESTORE_HOLD_DAYS', 30),
     ],
 
     /*
@@ -194,6 +206,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'backup' => [
+        // Configuration file included in the application-files backup.
+        'env_file' => env('BACKUP_ENV_FILE', base_path('.env')),
         // Disk that receives encrypted backups (S3/MinIO in production).
         'disk' => env('BACKUP_DISK', 'backups'),
         // Shared volume with the backup container (status + requests).

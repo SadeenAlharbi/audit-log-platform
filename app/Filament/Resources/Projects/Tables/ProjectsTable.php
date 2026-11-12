@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Projects\Tables;
 
 use App\Filament\Resources\Projects\Actions\ArchiveProjectAction;
 use App\Filament\Resources\Projects\Actions\SendTestLogAction;
+use App\Models\ProjectApiKey;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -28,9 +29,12 @@ class ProjectsTable
                         ->selectRaw('COUNT(*)')
                         ->whereColumn('audit_logs.project_id', 'projects.id')
                         ->where('audit_logs.occurred_at', '>=', now()->utc()->startOfDay()),
-                    'last_event_at' => DB::table('audit_logs')
-                        ->selectRaw('MAX(occurred_at)')
-                        ->whereColumn('audit_logs.project_id', 'projects.id'),
+                    // Last time a write key was used (plan §8 "last received"),
+                    // i.e. by arrival time, not by the event's own occurred_at.
+                    'last_received_at' => DB::table('project_api_keys')
+                        ->selectRaw('MAX(last_used_at)')
+                        ->whereColumn('project_api_keys.project_id', 'projects.id')
+                        ->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE),
                 ]))
             ->defaultSort('name')
             ->columns([
@@ -38,7 +42,7 @@ class ProjectsTable
                 TextColumn::make('slug')->label('المعرّف')->searchable()->fontFamily('mono')->copyable(),
                 IconColumn::make('is_active')->label('نشط')->boolean(),
                 TextColumn::make('logs_today')->label('سجلات اليوم')->numeric()->sortable(),
-                TextColumn::make('last_event_at')->label('آخر حدث')->dateTime()->since()->placeholder('—')->sortable(),
+                TextColumn::make('last_received_at')->label('آخر استلام')->dateTime()->since()->placeholder('—')->sortable(),
                 TextColumn::make('active_keys_count')->label('مفاتيح نشطة')->numeric(),
                 TextColumn::make('retention_days')->label('الاحتفاظ (يوم)')->numeric()->toggleable(),
                 TextColumn::make('archived_at')->label('أُرشف')->dateTime()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),

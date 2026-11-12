@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Projects\Schemas;
 
 use App\Models\AuditLog;
 use App\Models\Project;
+use App\Models\ProjectApiKey;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -36,9 +37,13 @@ class ProjectInfolist
                         TextEntry::make('logs_today')
                             ->label('سجلات اليوم')
                             ->state(fn (Project $record) => number_format(self::logsToday($record))),
-                        TextEntry::make('last_event_at')
-                            ->label('آخر حدث مستلم')
-                            ->state(fn (Project $record) => AuditLog::query()->withoutGlobalScopes()->where('project_id', $record->id)->max('occurred_at'))
+                        TextEntry::make('last_received_at')
+                            ->label('آخر استلام')
+                            ->helperText('آخر طلب كتابة وصل من النظام (بوقت الوصول)')
+                            ->state(fn (Project $record) => ProjectApiKey::query()->withoutGlobalScopes()
+                                ->where('project_id', $record->id)
+                                ->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE)
+                                ->max('last_used_at'))
                             ->dateTime()
                             ->since()
                             ->placeholder('لا يوجد بعد'),

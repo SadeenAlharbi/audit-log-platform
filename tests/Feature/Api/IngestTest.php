@@ -4,6 +4,7 @@ use App\Jobs\StoreAuditLogs;
 use App\Models\AuditLog;
 use App\Models\IngestionBatch;
 use App\Models\IngestionKey;
+use App\Models\SecurityEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
 
@@ -126,6 +127,8 @@ it('rejects payloads over 1MB', function () {
     sendApi($this, $this->issued, 'POST', '/api/v1/logs', logPayload(['metadata' => ['blob' => str_repeat('a', 2000)]]))
         ->assertStatus(413)
         ->assertJsonPath('error.code', 'payload_too_large');
+
+    expect(SecurityEvent::query()->where('reason', 'payload_too_large')->exists())->toBeTrue();
 });
 
 it('rejects a body that is not JSON', function () {

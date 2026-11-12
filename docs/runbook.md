@@ -172,6 +172,12 @@ dc exec app php artisan horizon:terminate
    - `dc exec app php artisan audit:partitions`.
    - عدد السجلات مقارنةً بآخر `max_audit_id` في `backup_runs.meta`.
    - `curl https://audit.example.com/api/v1/health`.
+8. سجّل الاستعادة (الخطة §12: كل استعادة تُسجَّل في `backup_runs` و`platform_audit`):
+   ```bash
+   dc exec app php artisan backup:record-restore full \
+     --source=full-20261111T020000Z.tar.gz.age --by="اسم المنفّذ" --reason="رقم البلاغ"
+   ```
+   وفي PITR: `backup:record-restore pitr --stop-at="2026-11-11 09:59:59" ...`.
 
 ### 3.2 الاستعادة إلى نقطة زمنية (PITR) بالـ Binary Logs
 
@@ -263,5 +269,5 @@ dc exec app php artisan audit:restore-archive erp --from=2026-09-01 --to=2026-09
 | يوميًا | نظرة على لوحة التحكم: الحجم اليومي، والدفعات الفاشلة، والمحاولات المرفوضة |
 | أسبوعيًا | تقرير اختبار الاستعادة الأخير، و`failed_jobs` = 0 |
 | شهريًا | تقرير الصلاحيات الحساسة. وتأكد أن `p_future` فارغ (`make partitions`) |
-| كل 3 أشهر | Access Review: راجع ملف CSV، وسحب الصلاحيات غير اللازمة يُسجَّل تلقائيًا. ثم تمرين استعادة كاملة يدويًا (القسم 3.1) على خادم منفصل |
+| كل 3 أشهر | Access Review: راجع ملف CSV، وسحب الصلاحيات غير اللازمة يُسجَّل تلقائيًا. ثم تمرين استعادة كاملة يدويًا (القسم 3.1) على خادم منفصل **من النسخة الخارجية المشفّرة** بالمفتاح الخاص المحفوظ خارج الخادم، وسجّله بـ `backup:record-restore full` (D13) |
 | عند ترقية MariaDB | صورة الـ backup يجب أن تطابق إصدار الخادم. ابنِ الصورتين معًا ثم خذ full جديدة |

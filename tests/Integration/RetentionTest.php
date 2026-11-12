@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('archive');
-    config(['audit.archive.settle_seconds' => 0]);
+    // The soft-archive grace period has its own test below.
+    config(['audit.archive.settle_seconds' => 0, 'audit.archive.grace_days' => 0]);
 });
 
 it('archives then deletes logs older than the project retention through the archiver account', function () {
@@ -66,4 +67,35 @@ it('restores one project from the archive without duplicates', function () {
     expect($restored)->toHaveCount(1)
         ->and($restored->first()->uid)->toBe($log->uid)
         ->and($restored->first()->new_values)->toBe(['a' => 1]);
+});
+
+it('keeps archived rows during the soft-archive grace period', function () {
+    config(['audit.archive.grace_days' => 7]);
+    $project = Project::factory()->create(['retention_days' => 7]);
+    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+
+    $this->artisan('audit:prune')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1)
+        ->and(Storage::disk('archive')->allFiles('logs/'.$project->slug))->not->toBeEmpty();
+
+    // Eight days later the archive run is old enough: the row goes.
+    $this->travel(8)->days();
+    $this->artisan('audit:prune --skip-archive')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('does not delete restored logs again while their hold lasts', function () {
+    $project = Project::factory()->create(['retention_days' => 7]);
+    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+    $this->artisan('audit:prune')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
+
+    $this->artisan('audit:restore-archive', ['project' => $project->slug, '--hold-days' => 5])->assertSuccessful();
+    $this->artisan('audit:prune')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
+
+    // After the hold, the normal retention applies again.
+    $this->travel(6)->days();
+    $this->artisan('audit:prune --skip-archive')->assertSuccessful();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
 });

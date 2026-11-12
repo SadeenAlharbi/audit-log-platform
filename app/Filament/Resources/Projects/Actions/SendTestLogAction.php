@@ -30,9 +30,11 @@ class SendTestLogAction
                     return;
                 }
 
-                $result['stored']
-                    ? Notification::make()->title('وصل السجل التجريبي وتم تخزينه')->body('المعرّف: '.$result['uid'])->success()->send()
-                    : Notification::make()->title('قُبل السجل وهو في الطابور')->body('المعرّف: '.$result['uid'].' — تأكد أن queue-worker يعمل.')->warning()->send();
+                match (true) {
+                    $result['status'] !== 202 => Notification::make()->title('رفضت الـ API السجل التجريبي')->body('رمز الاستجابة: '.$result['status'])->danger()->send(),
+                    $result['stored'] => Notification::make()->title('وصل السجل التجريبي وتم تخزينه')->body('مرّ عبر الـ API كاملة (المفتاح، التوقيع، التحقق، الطابور). المعرّف: '.$result['uid'])->success()->send(),
+                    default => Notification::make()->title('قُبل السجل وهو في الطابور')->body('المعرّف: '.$result['uid'].' — تأكد أن queue-worker يعمل.')->warning()->send(),
+                };
             });
     }
 }

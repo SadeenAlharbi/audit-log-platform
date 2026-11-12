@@ -44,6 +44,12 @@ class LogQueryController extends Controller
             $query->whereJsonContains('tags', (string) $request->query('tag'));
         }
 
+        if ($request->filled('tags')) {
+            foreach (array_unique(array_map('trim', explode(',', (string) $request->query('tags')))) as $tag) {
+                $query->whereJsonContains('tags', $tag);
+            }
+        }
+
         $perPage = (int) ($request->query('per_page') ?? 50);
 
         $logs = $query

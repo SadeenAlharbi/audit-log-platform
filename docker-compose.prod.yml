@@ -18,9 +18,13 @@ x-prod-app: &prod-app
     target: prod
   image: ${APP_IMAGE:-audit-log-platform/app}:${APP_IMAGE_TAG:-latest}
   env_file: .env
+  environment:
+    # backup:run --type=app includes this file (read-only mount below).
+    BACKUP_ENV_FILE: /etc/audit/.env
   volumes: !override
     - app-storage:/var/www/html/storage
     - backup-spool:/var/www/html/storage/app/backup-spool
+    - ./.env:/etc/audit/.env:ro
 
 services:
   app:

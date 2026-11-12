@@ -23,7 +23,7 @@ it('lists only the logs of the key\'s project, newest first', function () {
 });
 
 it('filters by event, actor, subject, severity, tag and time range', function () {
-    makeAuditLog($this->project, ['event' => 'user.login', 'actor_id' => '7', 'severity' => 'warning', 'tags' => ['auth']]);
+    makeAuditLog($this->project, ['event' => 'user.login', 'actor_id' => '7', 'severity' => 'warning', 'tags' => ['auth', 'sso']]);
     makeAuditLog($this->project, ['event' => 'user.logout', 'actor_id' => '8']);
     makeAuditLog($this->project, ['event' => 'order.paid', 'subject_type' => 'order', 'subject_id' => '55', 'severity' => 'critical']);
     makeAuditLog($this->project, ['event' => 'old', 'occurred_at' => now()->subDays(60)]);
@@ -36,6 +36,8 @@ it('filters by event, actor, subject, severity, tag and time range', function ()
         ->and($count('subject_type=order&subject_id=55'))->toBe(1)
         ->and($count('severity=warning,critical'))->toBe(2)
         ->and($count('tag=auth'))->toBe(1)
+        ->and($count('tags=auth,sso'))->toBe(1)
+        ->and($count('tags=auth,billing'))->toBe(0)
         ->and($count(''))->toBe(3) // default range: last 30 days
         ->and($count('from='.now()->subDays(90)->toDateString()))->toBe(4);
 });

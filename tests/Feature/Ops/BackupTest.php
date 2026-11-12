@@ -2,7 +2,9 @@
 
 use App\Console\Commands\BackupCleanCommand;
 use App\Models\BackupRun;
+use App\Models\PlatformAudit;
 use App\Notifications\PlatformAlert;
+use App\Services\Backup\AppFilesBackup;
 use App\Services\Backup\BackupSpool;
 use App\Services\Backup\GfsRetention;
 use Carbon\CarbonImmutable;
@@ -78,6 +80,37 @@ it('backs up the application files to the backups disk', function () {
     expect(Storage::disk('backups')->allFiles('app'))->toHaveCount(1);
 });
 
+it('includes the configuration file from BACKUP_ENV_FILE (production mount)', function () {
+    Storage::fake('backups');
+    $dir = storage_path('app/tmp/env-test-'.uniqid());
+    mkdir($dir, 0700, true);
+    file_put_contents($dir.'/.env', "APP_NAME=Test\n");
+    config(['audit.backup.env_file' => $dir.'/.env']);
+
+    $this->artisan('backup:run --type=app')->assertSuccessful();
+
+    $run = BackupRun::query()->where('type', 'app_files')->firstOrFail();
+    expect($run->status)->toBe('succeeded')->and($run->meta['env_included'])->toBeTrue();
+
+    $archive = tempnam(sys_get_temp_dir(), 'bk');
+    file_put_contents($archive, Storage::disk('backups')->get(Storage::disk('backups')->allFiles('app')[0]));
+    exec('tar -tzf '.escapeshellarg($archive), $entries);
+    expect($entries)->toContain('.env');
+
+    @unlink($dir.'/.env');
+    @rmdir($dir);
+    @unlink($archive);
+});
+
+it('fails loudly outside development when the configuration file is missing', function () {
+    Storage::fake('backups');
+    config(['audit.backup.env_file' => '/nonexistent/.env', 'audit.backup.age_recipient' => 'age1test']);
+    app()->detectEnvironment(fn () => 'production');
+
+    expect(fn () => app(AppFilesBackup::class)->run())->toThrow(RuntimeException::class, 'not readable');
+    expect(BackupRun::query()->where('type', 'app_files')->value('status'))->toBe('failed');
+});
+
 it('applies retention to off-site backups', function () {
     Storage::fake('backups');
     $disk = Storage::disk('backups');
@@ -91,4 +124,15 @@ it('applies retention to off-site backups', function () {
 
     expect($disk->allFiles('db'))->toBe(["db/full/full-{$new}.xb.gz.age"]);
     expect(BackupCleanCommand::timestamp("x/full-{$new}.age")->format('Ymd\THis\Z'))->toBe($new);
+});
+
+it('records a manual full or point-in-time restore', function () {
+    $this->artisan('backup:record-restore', ['kind' => 'pitr', '--stop-at' => '2026-11-11 09:59:59', '--by' => 'ops', '--reason' => 'INC-12'])
+        ->assertSuccessful();
+
+    $run = BackupRun::query()->where('type', 'restore')->sole();
+    expect($run->meta)->toMatchArray(['kind' => 'pitr', 'stop_at' => '2026-11-11 09:59:59', 'reason' => 'INC-12'])
+        ->and(PlatformAudit::query()->where('action', 'backup.restore_recorded')->exists())->toBeTrue();
+
+    $this->artisan('backup:record-restore', ['kind' => 'oops'])->assertFailed();
 });

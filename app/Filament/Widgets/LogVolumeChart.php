@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Support\PlatformsCode;
 use App\Models\AuditLog;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
@@ -36,9 +37,9 @@ class LogVolumeChart extends ChartWidget
 
         return [
             'datasets' => [
-                ['label' => 'info', 'data' => $series('info'), 'backgroundColor' => '#10b981', 'stack' => 's'],
-                ['label' => 'warning', 'data' => $series('warning'), 'backgroundColor' => '#f59e0b', 'stack' => 's'],
-                ['label' => 'critical', 'data' => $series('critical'), 'backgroundColor' => '#e11d48', 'stack' => 's'],
+                ['label' => 'معلومة', 'data' => $series('info'), 'backgroundColor' => PlatformsCode::PRIMARY[600], 'stack' => 's'],
+                ['label' => 'تحذير', 'data' => $series('warning'), 'backgroundColor' => PlatformsCode::WARNING[500], 'stack' => 's'],
+                ['label' => 'حرج', 'data' => $series('critical'), 'backgroundColor' => PlatformsCode::DANGER[600], 'stack' => 's'],
             ],
             'labels' => $days->map(fn ($d) => Carbon::parse($d)->format('m-d'))->all(),
         ];

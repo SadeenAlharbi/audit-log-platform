@@ -58,14 +58,19 @@ JSON
 }
 
 # ship <source-dir-or-file> <remote-subdir> <name> -> echoes "size location checksum"
+#
+# Every step is checked explicitly: ship() runs inside `if ! x="$(ship ...)"`,
+# where bash ignores `set -e`, so a silent failure would otherwise be recorded
+# as a successful backup. On an upload failure the encrypted artifact is kept
+# locally (and the run reported as failed) so nothing is lost.
 ship() {
     local src="$1" sub="$2" name="$3" out
     if [ -d "$src" ]; then
         out="$BACKUP_ROOT/artifacts/$name.tar.gz"
-        tar -C "$src" -czf "$out" .
+        tar -C "$src" -czf "$out" . || { log "ERROR: tar failed for $src"; rm -f "$out"; return 1; }
     else
         out="$BACKUP_ROOT/artifacts/$name.gz"
-        gzip -c "$src" > "$out"
+        gzip -c "$src" > "$out" || { log "ERROR: gzip failed for $src"; rm -f "$out"; return 1; }
     fi
     if [ -z "$AGE_RECIPIENT" ] && [ "${ALLOW_UNENCRYPTED_BACKUPS:-false}" != "true" ]; then
         rm -f "$out"
@@ -73,19 +78,27 @@ ship() {
         return 1
     fi
     if [ -n "$AGE_RECIPIENT" ]; then
-        age -r "$AGE_RECIPIENT" -o "$out.age" "$out"
+        age -r "$AGE_RECIPIENT" -o "$out.age" "$out" || { log "ERROR: age encryption failed"; rm -f "$out" "$out.age"; return 1; }
         rm -f "$out"
         out="$out.age"
     fi
-    local sum size location
-    sum="$(sha256sum "$out" | awk '{print $1}')"
-    size="$(stat -c %s "$out")"
+    local sum size location remote
+    sum="$(sha256sum "$out" | awk '{print $1}')" || return 1
+    size="$(stat -c %s "$out")" || return 1
     location="local:$out"
     if [ -n "$RCLONE_REMOTE" ]; then
-        rclone copyto --s3-no-check-bucket "$out" "$RCLONE_REMOTE/db/$sub/$(basename "$out")"
-        rclone check --one-way --download "$out" "$RCLONE_REMOTE/db/$sub/$(basename "$out")" >/dev/null 2>&1 || true
-        location="$RCLONE_REMOTE/db/$sub/$(basename "$out")"
-        rm -f "$out"   # the local copy of the backup directory is kept for incrementals
+        remote="$RCLONE_REMOTE/db/$sub/$(basename "$out")"
+        if ! rclone copyto --s3-no-check-bucket "$out" "$remote"; then
+            log "ERROR: upload to $remote failed - the encrypted artifact is kept at $out"
+            return 1
+        fi
+        # Byte-for-byte verification of the off-site copy (downloads it back).
+        if ! rclone check --one-way --download "$out" "$remote" >/dev/null 2>&1; then
+            log "ERROR: off-site copy $remote does not match the local artifact - kept at $out"
+            return 1
+        fi
+        location="$remote"
+        rm -f "$out"   # verified off-site; the local backup directory is kept for incrementals
     fi
     echo "$size $location $sum"
 }
@@ -145,18 +158,30 @@ run_binlogs() {
     local started; started="$(now_iso)"
     mariadb "${conn[@]}" -e "FLUSH BINARY LOGS" >/dev/null 2>&1 || log "warning: FLUSH BINARY LOGS failed"
     local current; current="$(mariadb "${conn[@]}" -N -e "SHOW MASTER STATUS" 2>/dev/null | awk '{print $1}')"
-    local copied=0 total=0
+    local copied=0 total=0 failed=0
     for f in "$DATADIR"/mariadb-bin.[0-9][0-9][0-9][0-9][0-9][0-9]; do  # not the .idx GTID index files
         [ -e "$f" ] || continue
         local name; name="$(basename "$f")"
         [ "$name" = "$current" ] && continue
         [ -e "$BACKUP_ROOT/binlogs/$name" ] && continue
-        cp -p "$f" "$BACKUP_ROOT/binlogs/$name"
-        local shipped size; shipped="$(ship "$BACKUP_ROOT/binlogs/$name" binlog "binlog-$(stamp)-$name")"
+        cp -p "$f" "$BACKUP_ROOT/binlogs/$name" || { failed=$((failed + 1)); continue; }
+        local shipped size
+        if ! shipped="$(ship "$BACKUP_ROOT/binlogs/$name" binlog "binlog-$(stamp)-$name")"; then
+            # Forget the local copy so the next run retries this file.
+            rm -f "$BACKUP_ROOT/binlogs/$name"
+            failed=$((failed + 1))
+            continue
+        fi
         size="$(awk '{print $1}' <<< "$shipped")"
         total=$((total + size)); copied=$((copied + 1))
     done
-    write_status binlog succeeded "$started" "$total" "${RCLONE_REMOTE:+$RCLONE_REMOTE/db/binlog/}" "" "" "{\"files\":$copied,\"current\":\"${current:-}\"}"
+    local meta="{\"files\":$copied,\"failed\":$failed,\"current\":\"${current:-}\"}"
+    if [ "$failed" -gt 0 ]; then
+        write_status binlog failed "$started" "$total" "" "" "$failed binary log file(s) could not be copied off-site" "$meta"
+        log "ERROR: binlogs copied: $copied, failed: $failed"
+        return 1
+    fi
+    write_status binlog succeeded "$started" "$total" "${RCLONE_REMOTE:+$RCLONE_REMOTE/db/binlog/}" "" "" "$meta"
     log "binlogs copied: $copied (current: ${current:-unknown})"
 }
 

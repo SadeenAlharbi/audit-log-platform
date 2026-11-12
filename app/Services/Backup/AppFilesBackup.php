@@ -33,9 +33,22 @@ class AppFilesBackup
 
         try {
             $archive = $tmp.'.tar.gz';
-            $this->exec(['tar', '-czf', $archive,
+            $command = ['tar', '-czf', $archive,
                 '--exclude=app/backup-spool', '--exclude=app/tmp', '--exclude=app/archive-cache',
-                '-C', base_path(), '.env', 'storage/app']);
+                '-C', base_path(), 'storage/app'];
+
+            // The configuration file lives at base_path('.env') in development;
+            // production containers get it injected as environment variables,
+            // so docker-compose.prod.yml mounts the host file read-only and
+            // BACKUP_ENV_FILE points at it.
+            $envFile = (string) config('audit.backup.env_file');
+            $envIncluded = is_file($envFile) && is_readable($envFile);
+            if ($envIncluded) {
+                $command = [...$command, '-C', dirname($envFile), basename($envFile)];
+            } elseif (! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException("The configuration file {$envFile} is not readable: set BACKUP_ENV_FILE or mount it (docker-compose.prod.yml).");
+            }
+            $this->exec($command);
 
             $recipient = config('audit.backup.age_recipient');
             // Security review M7: .env holds APP_KEY (which decrypts the HMAC
@@ -66,7 +79,7 @@ class AppFilesBackup
                 'size' => $size,
                 'checksum' => $checksum,
                 'location' => config('audit.backup.disk').':'.$path,
-                'meta' => ['encrypted' => filled($recipient)],
+                'meta' => ['encrypted' => filled($recipient), 'env_included' => $envIncluded],
             ])->save();
         } catch (Throwable $e) {
             $run->forceFill(['status' => 'failed', 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000)])->save();

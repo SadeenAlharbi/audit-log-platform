@@ -15,6 +15,7 @@ use App\Filament\Widgets\TopEventsTable;
 use App\Models\AuditLog;
 use App\Models\PlatformAudit;
 use App\Models\Project;
+use App\Models\ProjectApiKey;
 use App\Models\SecurityEvent;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -66,7 +67,10 @@ it('sends a test log from the project page', function () {
         ->callAction('sendTestLog')
         ->assertNotified('وصل السجل التجريبي وتم تخزينه');
 
-    expect(AuditLog::query()->where('project_id', $project->id)->where('event', 'platform.test')->exists())->toBeTrue();
+    $log = AuditLog::query()->where('project_id', $project->id)->where('event', 'platform.test')->firstOrFail();
+    // It went through the real API: stored with the temporary key, which is revoked now.
+    $key = ProjectApiKey::query()->findOrFail($log->api_key_id);
+    expect($key->revoked_at)->not->toBeNull()->and($key->project_id)->toBe($project->id);
 });
 
 it('archives a project and revokes its keys', function () {

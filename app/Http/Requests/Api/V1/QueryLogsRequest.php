@@ -10,7 +10,7 @@ class QueryLogsRequest extends FormRequest
 {
     public const FILTERS = [
         'event', 'action', 'severity', 'actor_type', 'actor_id', 'subject_type', 'subject_id',
-        'tag', 'correlation_id', 'request_id', 'external_id', 'from', 'to', 'per_page', 'cursor',
+        'tag', 'tags', 'correlation_id', 'request_id', 'external_id', 'from', 'to', 'per_page', 'cursor',
     ];
 
     public function authorize(): bool
@@ -32,6 +32,8 @@ class QueryLogsRequest extends FormRequest
             'subject_type' => ['nullable', 'string', 'max:191'],
             'subject_id' => ['nullable', 'string', 'max:191'],
             'tag' => ['nullable', 'string', 'max:50'],
+            // Comma-separated; a log matches when it carries ALL of them.
+            'tags' => ['nullable', 'string', 'max:255', 'regex:/^[^,]{1,50}(,[^,]{1,50}){0,9}$/'],
             'correlation_id' => ['nullable', 'string', 'max:64'],
             'request_id' => ['nullable', 'string', 'max:64'],
             'external_id' => ['nullable', 'string', 'max:191'],

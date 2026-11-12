@@ -21,6 +21,7 @@ class SecurityEventRecorder
         'missing_credentials', 'invalid_key', 'project_mismatch', 'key_revoked', 'key_expired',
         'project_inactive', 'ip_not_allowed', 'scope_denied', 'missing_signature', 'invalid_signature',
         'stale_timestamp', 'replayed_request', 'rate_limited', 'https_required', 'payload_too_large',
+        'unsupported_media_type', 'ip_rate_limited',
     ];
 
     public function __construct(private AlertNotifier $alerts) {}

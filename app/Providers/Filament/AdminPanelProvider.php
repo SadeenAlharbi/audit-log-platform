@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Support\InitialsAvatarProvider;
+use App\Filament\Support\PlatformsCode;
 use App\Filament\Widgets\ActiveProjectsTable;
 use App\Filament\Widgets\LogVolumeChart;
 use App\Filament\Widgets\PlatformStats;
@@ -17,8 +18,9 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -45,12 +47,11 @@ class AdminPanelProvider extends PanelProvider
                 AppAuthentication::make()->recoverable(),
             ], isRequired: true)
             ->multiFactorAuthenticationRequiredMiddlewareName(RequireMfaForPrivilegedRoles::class)
-            ->colors([
-                'primary' => Color::Emerald,
-                'danger' => Color::Rose,
-                'warning' => Color::Amber,
-                'info' => Color::Sky,
-            ])
+            // Platforms Code (DGA unified design system): colours and typeface.
+            ->colors(PlatformsCode::colors())
+            ->font(PlatformsCode::FONT)
+            ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): View => view('filament.partials.platforms-code-styles'))
+            ->renderHook(PanelsRenderHook::FOOTER, fn (): View => view('filament.partials.footer'))
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
             ->navigationGroups([

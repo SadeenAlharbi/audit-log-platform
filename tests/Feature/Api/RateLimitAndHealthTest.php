@@ -47,6 +47,8 @@ it('throttles unauthenticated floods per IP before checking keys', function () {
     $this->postJson('/api/v1/logs', [])
         ->assertStatus(429)
         ->assertJsonPath('error.code', 'rate_limited');
+
+    expect(SecurityEvent::query()->where('reason', 'ip_rate_limited')->count())->toBe(1);
 });
 
 it('stores a bounded number of security events per IP and minute', function () {

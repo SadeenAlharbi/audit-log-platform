@@ -47,10 +47,10 @@
 | Facade، Trait `Auditable`، Listener للمصادقة، Middleware لـ request_id | ✓ | 68 اختبارًا في الحزمة |
 | توقيع HMAC تلقائي وإخفاء الحقول | ✓ | `Security/Signer`، `Security/Masker`. التوقيع مطابق لتوقيع المنصة: 200 من 200 مدخلًا عشوائيًا، واختبار end-to-end حقيقي |
 | outbox + `audit:flush` | ✓ | `DatabaseOutbox` / `FileOutbox`، `FlushCommand` |
-| نشر بمستودع Composer خاص + SemVer + CHANGELOG | ✓ | `docs/publishing.md`، `docs/satis.json`، `CHANGELOG.md`، tag `v1.0.0` |
+| نشر بمستودع Composer خاص + SemVer + CHANGELOG | ◐ | جاهز: `docs/publishing.md`، `docs/satis.json`، `CHANGELOG.md`، tag `v1.0.0`. النشر نفسه بعد موافقة صاحبة المشروع (D17) |
 | اختبارات بـ `Http::fake()` | ✓ | `tests/` في الحزمة |
 | أمثلة cURL / PHP / JS / Python | ✓ | `docs/integration-guide.md` وصفحة المشروع في اللوحة |
-| Onboarding: slug ومفتاح تلقائي، يُعرض مرة واحدة، hash، أكثر من مفتاح، تدوير وإلغاء، صفحة دليل الربط، زر سجل تجريبي | ✓ | `FilamentPagesTest`، `FilamentActionsTest` |
+| Onboarding: slug ومفتاح تلقائي، يُعرض مرة واحدة، hash، أكثر من مفتاح، تدوير وإلغاء، صفحة دليل الربط، زر سجل تجريبي يمرّ عبر الـ API كاملة بمفتاح مؤقت | ✓ | `FilamentPagesTest`، `FilamentActionsTest` |
 
 ## §6 الـ API
 
@@ -93,7 +93,7 @@
 | `audit:prune` حسب `retention_days` | ✓ | D3، `RetentionTest` |
 | أرشفة JSONL مضغوطة إلى S3/MinIO قبل أي حذف | ✓ | `LogArchiver` (watermark)، `ArchiveTest` |
 | عدم الحذف الفوري | ✓ | الحذف لا يتجاوز الـ watermark، وحساب الأرشفة فقط |
-| استعادة سجلات مشروع واحد | ✓ | `audit:restore-archive`، وزر في اللوحة. تقرير الاستعادة §5 |
+| استعادة سجلات مشروع واحد | ✓ | `audit:restore-archive`، وزر في اللوحة. النطاق المسترجَع محمي من الحذف الليلي (D18، `RetentionTest`). تقرير الاستعادة §5 |
 
 ## §10 الجودة
 
@@ -126,7 +126,7 @@
 | spatie/laravel-backup لملفات التطبيق | ◐ | بديل مكافئ مشفّر بـ age وبنفس أسماء الأوامر (D7) |
 | تشفير قبل الرفع (age)، والمفتاح خارج الخادم | ✓ | `bin/setup` + Runbook §1.3 |
 | `backup:run` / `clean` / `monitor` + سياسة 14/8/12 | ✓ | `BackupTest` |
-| `backup:restore-test` أسبوعيًا مع Checksum | ✓ | `backup.sh restore-test`، تقرير الاستعادة |
+| `backup:restore-test` أسبوعيًا مع Checksum | ✓ | `backup.sh restore-test` على السلسلة المحلية، والنسخة الخارجية مُتحقَّق منها بايتًا ببايت عند الرفع وتمرين ربع سنوي (D13) |
 | تنبيه عند فشل النسخ أو الحجم غير الطبيعي أو فشل الاختبار | ✓ | `backup:monitor` |
 | Runbook للاستعادة الكاملة والجزئية | ✓ | `docs/runbook.md` |
 | `backup_runs` في Filament | ✓ | صفحة «النسخ الاحتياطي» |
@@ -136,12 +136,12 @@
 | المتطلب | الحالة | الدليل |
 |---|---|---|
 | RBAC بـ spatie، مستويان، الأدوار الخمسة، الصلاحيات التفصيلية | ✓ | `docs/permissions-matrix.md`، `RoleMatrixTest` |
-| Policies لكل Model في Filament والـ API | ✓ | `app/Policies` |
+| Policies لكل Model في Filament والـ API | ✓ | `app/Policies` للوحة، ونطاق المفتاح وربطه بمشروع في الـ API (D14) |
 | Global Scope على AuditLog وProject | ✓ | `ProjectAccessScope` (ويشمل ProjectApiKey) |
 | scopes للمفاتيح ومنع الجمع إلا بقرار صريح | ✓ | `FilamentPagesTest` |
 | منع التعديل في الـ Policy والـ Trigger | ✓ | `RoleMatrixTest`، `AppendOnlyTest` |
 | 2FA إلزامي لـ Super Admin وSecurity Officer | ✓ | `FilamentPagesTest` |
-| SSO (SAML/OIDC) «إن وُجد» | ◐ | غير مفعّل: لم يُحدَّد مزوّد هوية في الشركة. Filament يدعم إضافته لاحقًا دون تغيير المخطط |
+| SSO (SAML/OIDC) «إن وُجد» | ◐ | غير مفعّل: لم يُحدَّد مزوّد هوية بعد (D15). يُضاف دون تغيير الصلاحيات أو المخطط |
 | انتهاء الجلسة، قفل الحساب، كلمات مرور قوية، تدوير المفاتيح كل 90 يومًا | ✓ | `SESSION_LIFETIME=30`، `SecurityOpsTest` |
 | Self-Audit في platform_audit | ✓ | `PlatformAuditObserver`، `RecordPermissionChanges` |
 | تقرير دوري بالصلاحيات الحساسة + Access Review كل 3 أشهر | ✓ | `access:review` |
@@ -159,3 +159,24 @@
 | مصفوفة الأدوار موثقة ومختبرة | `docs/permissions-matrix.md` + `RoleMatrixTest` |
 | تغطية 80%+ للـ API | `bin/coverage-api` (95.3%) |
 | تقرير اختبار استعادة ناجح | `docs/reports/restore-test-2026-11-11.md` |
+
+## تحديث 2026-11-12: مراجعة مستقلة ثانية
+
+راجع مراجع مستقل الكود مقابل الخطة بندًا بندًا. ما وجده وأُصلح:
+
+| الملاحظة | الإصلاح | الاختبار |
+|---|---|---|
+| فشل التشفير أو الرفع في `backup.sh` قد يُسجَّل نجاحًا | فحص صريح لكل خطوة، والاحتفاظ بالملف المشفّر محليًا عند فشل الرفع، وتعليم دفعة الـ binlog فاشلة إن فشل أي ملف | اختبار يدوي بـ rclone وهمي يفشل وينجح |
+| نسخ ملفات التطبيق تفشل في الإنتاج لغياب `.env` داخل الحاوية | `BACKUP_ENV_FILE` وتركيب الملف للقراءة فقط في `docker-compose.prod.yml`، ورفض صريح إن غاب | `BackupTest` (اختباران) |
+| السجلات المسترجعة من الأرشيف تُحذف في نفس الليلة | حماية النطاق المسترجَع (D18) | `RetentionTest` |
+| لا «أرشفة لينة» قبل الحذف | فترة سماح 7 أيام بعد الأرشفة (D18) | `RetentionTest` |
+| زر السجل التجريبي لا يمر بالـ API | طلب حقيقي موقّع عبر نفس المسار والـ Middleware بمفتاح مؤقت يُلغى فورًا | `FilamentActionsTest` |
+| «آخر استلام» محسوب بوقت الحدث | بوقت الوصول (آخر استخدام لمفتاح كتابة) | — |
+| لا اختبار لعزل التصدير بين المشاريع | اختبار CSV وJSON: لا سجلات لمشروع آخر، والقيم الحساسة مخفية | `FilamentPagesTest` |
+| تصفية بوسم واحد فقط | `tags=a,b` (كل الوسوم) | `QueryTest` |
+| الرفض بحد الـ IP وأخطاء 413/415 لا تُسجَّل | تُسجَّل في `security_events` (مع أخذ العينات) | `RateLimitAndHealthTest`، `IngestTest` |
+| الاستعادة الكاملة اليدوية لا تُسجَّل | `backup:record-restore` وخطوة في الـ Runbook | `BackupTest` |
+| `schema.sql` مولَّد بأقسام شهر واحد | أُعيد توليده بـ 13 شهرًا، والجداول مطابقة للنسخة المجمّدة | — |
+| `SESSION_SECURE_COOKIE` غير موجود في `.env.docker.example` | أُضيف | — |
+| `composer.lock` قديم | حُدّث بالحزم الجديدة (`aws`، `telescope`) | — |
+

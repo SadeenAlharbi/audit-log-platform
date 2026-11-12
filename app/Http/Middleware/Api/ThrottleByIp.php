@@ -3,6 +3,7 @@
 namespace App\Http\Middleware\Api;
 
 use App\Http\Responses\ApiError;
+use App\Services\Security\SecurityEventRecorder;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,6 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ThrottleByIp
 {
+    public function __construct(private SecurityEventRecorder $security) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         $key = 'api-ip:'.sha1((string) $request->ip());
@@ -24,6 +27,9 @@ class ThrottleByIp
 
         if (RateLimiter::tooManyAttempts($key, $max)) {
             $retryAfter = RateLimiter::availableIn($key);
+            // Plan §7: every failed attempt is logged. The recorder samples
+            // per IP and minute, so a flood writes a bounded number of rows.
+            $this->security->record($request, 'ip_rate_limited');
 
             return ApiError::make('rate_limited', 'Too many requests from this address.', 429, null, [
                 'Retry-After' => (string) $retryAfter,

@@ -15,14 +15,15 @@ use Throwable;
  * Restores one project's logs from the JSONL archive (plan §9: "restore one
  * project's logs from the archive on request"). Rows keep their original
  * id and uid; rows that still exist are skipped (INSERT IGNORE), so running
- * it twice is harmless.
+ * it twice is harmless. The restored range is protected from the nightly
+ * prune for audit.archive.restore_hold_days days.
  */
 class ArchiveRestorer
 {
     /**
      * @return array{files: int, rows: int, inserted: int}
      */
-    public function restore(Project $project, CarbonImmutable $from, CarbonImmutable $to, ?User $by = null, bool $dryRun = false): array
+    public function restore(Project $project, CarbonImmutable $from, CarbonImmutable $to, ?User $by = null, bool $dryRun = false, ?int $holdDays = null): array
     {
         $disk = Storage::disk((string) config('audit.archive.disk'));
         $run = $dryRun ? null : BackupRun::query()->create([
@@ -30,7 +31,16 @@ class ArchiveRestorer
             'status' => 'running',
             'started_at' => now(),
             'triggered_by' => $by?->id,
-            'meta' => ['project' => $project->slug, 'from' => $from->toIso8601String(), 'to' => $to->toIso8601String()],
+            'meta' => [
+                'project' => $project->slug,
+                'project_id' => $project->id,
+                'from' => $from->toIso8601String(),
+                'to' => $to->toIso8601String(),
+                // The nightly prune leaves this range alone until then
+                // (RetentionPruner::activeHolds), otherwise expired logs that
+                // were restored on request would be deleted again that night.
+                'hold_until' => now()->utc()->addDays($holdDays ?? (int) config('audit.archive.restore_hold_days', 30))->toIso8601String(),
+            ],
         ]);
 
         $files = 0;

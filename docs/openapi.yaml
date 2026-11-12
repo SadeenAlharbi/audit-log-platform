@@ -144,6 +144,7 @@ paths:
         - { name: subject_type, in: query, schema: { type: string } }
         - { name: subject_id, in: query, schema: { type: string } }
         - { name: tag, in: query, schema: { type: string } }
+        - { name: tags, in: query, description: 'Comma-separated tags; matches logs that carry all of them (up to 10).', schema: { type: string, example: 'billing,eu' } }
         - { name: correlation_id, in: query, schema: { type: string } }
         - { name: request_id, in: query, schema: { type: string } }
         - { name: external_id, in: query, schema: { type: string } }

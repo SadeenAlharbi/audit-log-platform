@@ -17,6 +17,7 @@ use Throwable;
     {--from= : occurred_at from (date)}
     {--to= : occurred_at to (date, inclusive)}
     {--dry-run : Count only}
+    {--hold-days= : Days the restored logs are kept before the prune may remove them again}
     {--user= : Id of the dashboard user who requested it}')]
 #[Description('Restore one project\'s audit logs from the JSONL archive (partial restore)')]
 class RestoreArchiveCommand extends Command
@@ -35,7 +36,8 @@ class RestoreArchiveCommand extends Command
         $user = $this->option('user') ? User::query()->find($this->option('user')) : null;
 
         try {
-            $result = $restorer->restore($project, $from, $to, $user, (bool) $this->option('dry-run'));
+            $holdDays = $this->option('hold-days') !== null ? max(1, (int) $this->option('hold-days')) : null;
+            $result = $restorer->restore($project, $from, $to, $user, (bool) $this->option('dry-run'), $holdDays);
         } catch (Throwable $e) {
             $alerts->send('restore:failed:'.$project->slug, 'Archive restore failed', $e->getMessage(), 'critical', ['project' => $project->slug]);
             $this->components->error($e->getMessage());

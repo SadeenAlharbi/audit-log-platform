@@ -3,6 +3,7 @@
 namespace App\Services\Archive;
 
 use App\Models\BackupRun;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -33,6 +34,26 @@ class LogArchiver
         $run = BackupRun::query()
             ->where('type', 'logs_archive')
             ->where('status', 'succeeded')
+            ->latest('id')
+            ->first();
+
+        return (int) ($run?->meta['last_id'] ?? 0);
+    }
+
+    /**
+     * Highest id whose archive run finished at least $graceDays ago: the
+     * retention prune never deletes above it (plan §9, soft archive).
+     */
+    public static function settledWatermark(CarbonImmutable $now, int $graceDays): int
+    {
+        if ($graceDays <= 0) {
+            return self::watermark();
+        }
+
+        $run = BackupRun::query()
+            ->where('type', 'logs_archive')
+            ->where('status', 'succeeded')
+            ->where('finished_at', '<=', $now->subDays($graceDays))
             ->latest('id')
             ->first();
 

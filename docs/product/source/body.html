@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>وثيقة منتج منصة سجلات التدقيق المركزية</title>
+<style>
+  @page { size: A4; margin: 22mm 16mm 18mm 16mm; }
+  :root {
+    --g600: #1B8354; --g700: #166A45; --g800: #14573A; --g900: #104631; --g50: #F3FCF6; --g100: #DFF6E7;
+    --gray50: #F9FAFB; --gray100: #F3F4F6; --gray200: #E5E7EB; --gray300: #D2D6DB; --gray500: #6C737F; --gray700: #384250;
+    --text: #161616; --gold: #E9B949; --blue50: #EFF8FF; --blue200: #B2DDFF; --blue700: #175CD3;
+    --amber50: #FFFAEB; --amber300: #FEC84B; --amber700: #B54708;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: "IBM Plex Sans Arabic", "DejaVu Sans", sans-serif; color: var(--text); font-size: 10pt; line-height: 1.75; }
+  code, .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; direction: ltr; unicode-bidi: embed; background: var(--gray100); padding: 0 4px; border-radius: 4px; }
+
+  /* Cover */
+  .cover { height: 297mm; width: 210mm; position: relative; color: #fff; page-break-after: always;
+    background: linear-gradient(160deg, #1d8a59 0%, #14573A 55%, #0c3a27 100%); overflow: hidden; }
+  .cover .mark { position: absolute; top: 28mm; left: 24mm; right: 24mm; display: flex; justify-content: space-between; align-items: center; }
+  .cover .logo { font-weight: 700; font-size: 15pt; letter-spacing: .3px; direction: ltr; }
+  .cover .logo small { display: block; font-weight: 400; font-size: 9pt; opacity: .8; }
+  .cover .glyph { width: 46px; height: 46px; border-radius: 10px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; font-size: 20pt; }
+  .cover .body { position: absolute; top: 112mm; right: 24mm; left: 24mm; }
+  .chip { display: inline-block; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.12); border-radius: 999px; padding: 2px 14px; font-size: 9pt; }
+  .cover h1 { font-size: 30pt; margin: 14px 0 6px; line-height: 1.3; }
+  .cover .en { font-size: 13pt; opacity: .85; direction: ltr; text-align: right; }
+  .cover .bar { width: 64px; height: 5px; background: var(--gold); border-radius: 3px; margin: 18px 0; }
+  .cover .sub { color: var(--gold); font-weight: 700; font-size: 13pt; }
+  .cover p { opacity: .9; max-width: 150mm; }
+  .cover .meta { position: absolute; bottom: 26mm; right: 24mm; left: 24mm; display: flex; gap: 18mm; font-size: 9pt; }
+  .cover .meta b { display: block; font-size: 9.5pt; }
+
+  /* Sections */
+  h2 { display: flex; align-items: center; gap: 10px; font-size: 15pt; margin: 18px 0 8px; break-after: avoid; }
+  h2 .n { flex: none; width: 28px; height: 28px; border-radius: 7px; background: var(--g600); color: #fff; font-size: 10.5pt; display: grid; place-items: center; }
+  h3 { font-size: 11pt; margin: 12px 0 4px; break-after: avoid; }
+  p { margin: 4px 0 8px; }
+  section { break-inside: auto; }
+  .page { break-before: page; }
+  .lead { color: var(--gray700); }
+
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9pt; break-inside: avoid; }
+  th { background: var(--g50); color: var(--g800); text-align: right; font-weight: 700; padding: 7px 9px; border: 1px solid var(--gray200); }
+  td { padding: 7px 9px; border: 1px solid var(--gray200); vertical-align: top; }
+  td:first-child { font-weight: 700; white-space: nowrap; }
+  .note { font-size: 8.5pt; color: var(--gray500); margin-top: -4px; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 8px 0 10px; }
+  .cards.three { grid-template-columns: 1fr 1fr 1fr; }
+  .card { border: 1px solid var(--gray200); border-radius: 10px; padding: 10px 12px; break-inside: avoid; }
+  .card h4 { margin: 0 0 3px; font-size: 10pt; }
+  .card p { margin: 0; font-size: 9pt; color: var(--gray700); }
+  .card.blue { border-color: var(--blue200); background: var(--blue50); }
+  .card.blue h4 { color: var(--blue700); }
+  .card.green { border-color: #ABEFC6; background: #ECFDF3; }
+  .card.green h4 { color: #067647; }
+  .card.amber { border-color: var(--amber300); background: var(--amber50); }
+  .card.amber h4 { color: var(--amber700); }
+
+  .callout { border-right: 4px solid var(--g600); background: var(--g50); padding: 8px 12px; border-radius: 6px; font-size: 9pt; margin: 8px 0; break-inside: avoid; }
+  .steps { margin: 6px 0 10px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--gray200); break-inside: avoid; }
+  .step:last-child { border-bottom: 0; }
+  .step .k { width: 24px; height: 24px; border-radius: 50%; background: var(--g100); color: var(--g700); font-weight: 700; display: grid; place-items: center; font-size: 9pt; }
+  .step b { display: block; font-size: 10pt; }
+  .step span { color: var(--gray700); font-size: 9pt; }
+
+  figure { margin: 8px 0 12px; break-inside: avoid; }
+  figure .frame { border: 1px solid var(--gray200); border-radius: 12px; padding: 8px; background: var(--gray50); }
+  figure img { display: block; max-width: 100%; max-height: 88mm; margin: 0 auto; border-radius: 6px; border: 1px solid var(--gray200); }
+  figure.narrow .frame { width: 62%; margin: 0 auto; }
+  figure.narrow img { max-height: 62mm; }
+  figcaption { font-size: 8.5pt; color: var(--gray500); margin-top: 5px; }
+  figcaption b { color: var(--text); }
+
+  .flow { display: flex; flex-direction: row; gap: 6px; align-items: stretch; margin: 8px 0 10px; break-inside: avoid; }
+  .flow div { flex: 1; border: 1px solid var(--gray200); border-radius: 8px; padding: 7px; text-align: center; font-size: 8.5pt; background: #fff; }
+  .flow div b { display: block; color: var(--g700); font-size: 9pt; }
+  .tag { display: inline-block; font-size: 8pt; padding: 0 8px; border-radius: 999px; background: var(--g100); color: var(--g700); font-weight: 700; }
+  .tag.gray { background: var(--gray100); color: var(--gray700); }
+  .summary { border: 1px solid #ABEFC6; background: #F6FEF9; border-radius: 12px; padding: 12px 14px; }
+  ul { margin: 4px 0 8px; padding-right: 18px; }
+  li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<!-- ============ 1-4 ============ -->
+<section>
+  <h2><span class="n">1</span>نظرة عامة على المنتج</h2>
+  <p>منصة مركزية تستقبل <b>سجلات التدقيق</b> من كل أنظمة الجهة، أي إجابة السؤال: <b>«مَن فعل ماذا، ومتى، وعلى ماذا؟»</b>، وتحفظها في مكان واحد آمن. اليوم كل نظام يسجّل بطريقته أو لا يسجّل أصلًا، والسجلات مبعثرة وقابلة للتعديل. المنصة تجعل لكل حدث مهم أثرًا موثّقًا لا يُمحى، يُرجع إليه عند أي تحقيق أو مراجعة أو تدقيق.</p>
+  <p>يقوم المنتج على ثلاثة مبادئ: <b>السجل لا يُعدَّل ولا يُحذف</b> حتى من مدير النظام، و<b>كل نظام يرى سجلاته فقط</b>، و<b>كل وصول مرفوض أو إجراء إداري يُسجَّل بدوره</b>.</p>
+
+  <h2><span class="n">2</span>ما المشكلة التي يحلها؟</h2>
+  <div class="cards">
+    <div class="card"><h4>قبل المنصة</h4><p>سجلات في كل نظام بشكل مختلف، يمكن لمن يملك صلاحية على قاعدة البيانات تعديلها أو حذفها، ولا يمكن البحث فيها مجتمعة، وتضيع عند استبدال النظام.</p></div>
+    <div class="card green"><h4>بعد المنصة</h4><p>مكان واحد بصيغة موحّدة، محمي من التعديل على مستوى قاعدة البيانات، يُبحث فيه ويُصدَّر بضغطة، ومحفوظ بنسخ مشفّرة خارج الخادم.</p></div>
+  </div>
+
+  <h2><span class="n">3</span>الأدوار في المنتج</h2>
+  <table>
+    <tr><th style="width:23%">الدور</th><th>ما الذي يفعله</th><th style="width:24%">نطاقه</th></tr>
+    <tr><td>النظام المتصل</td><td>يرسل السجلات آليًا عبر الـ API بمفتاح خاص به (وتوقيع إن كان حساسًا).</td><td>مشروعه فقط، كتابة أو قراءة</td></tr>
+    <tr><td>مدير المنصة</td><td>ينشئ المشاريع والمفاتيح، ويدير المستخدمين والأدوار، ويتابع النسخ والطوابير.</td><td>كل المنصة</td></tr>
+    <tr><td>مدقق المنصة</td><td>يقرأ سجلات كل المشاريع ويصدّرها لأغراض التدقيق، بلا أي صلاحية تعديل.</td><td>كل المشاريع، قراءة</td></tr>
+    <tr><td>مسؤول الأمن</td><td>يتابع المحاولات المرفوضة، ويقيّد عناوين IP للمفاتيح.</td><td>الأحداث الأمنية</td></tr>
+    <tr><td>مالك المشروع</td><td>يدير مفاتيح مشروعه ويرى سجلاته ويصدّرها.</td><td>مشروعه</td></tr>
+    <tr><td>مشاهد المشروع</td><td>يبحث في سجلات مشروعه ويصدّرها.</td><td>مشروعه، قراءة</td></tr>
+  </table>
+  <p class="note">الأدوار العليا (مدير، مدقق، أمن) ومن يملك صلاحية كشف البيانات الحساسة ملزمون بالمصادقة الثنائية. ويمكن إنشاء أدوار مخصصة.</p>
+</section>
+
+<section class="page">
+  <h2><span class="n">4</span>رحلة السجل</h2>
+  <p>كل سجل يمر بسبع مراحل متسلسلة، ولكل مرحلة جهة مسؤولة عنها:</p>
+  <table>
+    <tr><th style="width:22%">المرحلة</th><th style="width:22%">المسؤول</th><th>ما يحدث فيها</th></tr>
+    <tr><td>1. الإرسال</td><td>النظام المتصل</td><td>يرسل الحدث (فردي أو دفعة حتى 500) مع مفتاحه.</td></tr>
+    <tr><td>2. التحقق</td><td>المنصة</td><td>المفتاح، والتوقيع، والحجم (1MB)، والحقول. أي رفض يُسجَّل حدثًا أمنيًا.</td></tr>
+    <tr><td>3. منع التكرار</td><td>المنصة</td><td>إن سبق استلام نفس <span class="mono">external_id</span> يُرد فورًا بأنه مكرر.</td></tr>
+    <tr><td>4. الاستلام</td><td>المنصة</td><td>رد فوري (202) برقم السجل، ثم يُخزَّن في الخلفية عبر طابور.</td></tr>
+    <tr><td>5. الحفظ</td><td>قاعدة البيانات</td><td>في قسم شهري، ومحمي من التعديل والحذف بقواعد داخل القاعدة نفسها.</td></tr>
+    <tr><td>6. العرض</td><td>مستخدمو اللوحة</td><td>بحث وتصفية وتصدير، كلٌّ في حدود صلاحيته، مع إخفاء الحقول الحساسة.</td></tr>
+    <tr><td>7. الأرشفة والحذف</td><td>المنصة آليًا</td><td>أرشيف مضغوط خارج القاعدة، ثم حذف بعد انتهاء مدة الاحتفاظ وفترة سماح.</td></tr>
+  </table>
+
+  <h2><span class="n">5</span>مفاهيم تحكم المنتج</h2>
+  <div class="cards">
+    <div class="card blue"><h4>السجل غير قابل للتعديل</h4><p>قواعد (Triggers) داخل قاعدة البيانات ترفض أي تعديل، والحذف مسموح لحساب الأرشفة وحده بعد الأرشفة. لا يوجد زر تعديل أو حذف في أي مكان.</p></div>
+    <div class="card blue"><h4>المشروع = النظام المتصل</h4><p>لكل نظام مشروع بمعرّف ثابت ومفاتيحه الخاصة. المفتاح يُعرض مرة واحدة ويُحفظ مشفّرًا، ويمكن تدويره وإلغاؤه.</p></div>
+    <div class="card blue"><h4>إخفاء البيانات الحساسة</h4><p>كلمات المرور والرموز وأرقام البطاقات تُحذف قبل التخزين. والهوية الوطنية والآيبان تُخزَّن وتظهر مخفية إلا لمن يملك صلاحية خاصة.</p></div>
+    <div class="card blue"><h4>سجل تدقيق للمنصة نفسها</h4><p>كل إجراء إداري (إنشاء مفتاح، تغيير صلاحية، تصدير، استعادة) يُسجَّل بفاعله ووقته، ولا يُعدَّل ولا يُحذف.</p></div>
+  </div>
+  <div class="callout"><b>التنبيهات:</b> فشل نسخة احتياطية، أو تكرار الرفض من عنوان واحد، أو تراكم الطابور، أو قرب انتهاء مفتاح، يصل بالبريد أو Slack فورًا، ولا يتكرر التنبيه نفسه خلال دقائق.</div>
+</section>
+
+<section class="page">
+  <h2><span class="n">6</span>ربط نظام بالمنصة</h2>
+  <p>الربط لا يحتاج أكثر من مفتاح وطلب HTTP واحد. مشاريع Laravel لها حزمة جاهزة (<span class="mono">company/audit-client</span>) تسجّل التغييرات تلقائيًا.</p>
+  <div class="steps">
+    <div class="step"><div class="k">1</div><div><b>إنشاء المشروع</b><span>من «المشاريع ← إنشاء»: يُولَّد المعرّف وأول مفتاح، ويُعرض المفتاح مرة واحدة فقط.</span></div></div>
+    <div class="step"><div class="k">2</div><div><b>اختيار نوع المفتاح</b><span>كتابة للإرسال، أو قراءة للاستعلام، مع توقيع HMAC اختياري للأنظمة الحساسة، وتقييد بعناوين IP.</span></div></div>
+    <div class="step"><div class="k">3</div><div><b>الإرسال</b><span>دليل الربط في صفحة المشروع فيه أمثلة جاهزة: cURL وPHP وNode.js وPython وLaravel.</span></div></div>
+    <div class="step"><div class="k">4</div><div><b>سجل تجريبي</b><span>زر «إرسال سجل تجريبي» يمر بالمسار الحقيقي كاملًا (المفتاح والتوقيع والتحقق والطابور) ويؤكد وصوله.</span></div></div>
+  </div>
+  <figure><div class="frame"><img src="img/project-view.jpg" alt=""></div>
+    <figcaption><b>شكل 1:</b> صفحة المشروع: بياناته، وإحصائياته (سجلات اليوم وآخر استلام)، وأزرار التعديل والسجل التجريبي والأرشفة.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h2><span class="n">7</span>لوحة التحكم والسجلات</h2>
+  <p>اللوحة عربية بالكامل، وتعرض لكل مستخدم ما يخصه فقط. الصفحة الرئيسية تلخص اليوم: عدد السجلات، والأحداث الحرجة، والمحاولات المرفوضة، والدفعات الفاشلة، وحجم الأيام الأخيرة.</p>
+  <figure><div class="frame"><img src="img/dashboard.jpg" alt=""></div>
+    <figcaption><b>شكل 2:</b> الصفحة الرئيسية: مؤشرات اليوم ورسم حجم السجلات حسب الخطورة.</figcaption></figure>
+  <p>صفحة <b>سجلات التدقيق</b> للبحث بالمشروع والحدث والفاعل والكيان والخطورة والفترة، والتصدير CSV أو JSON (والتصدير نفسه يُسجَّل).</p>
+  <figure><div class="frame"><img src="img/logs.jpg" alt=""></div>
+    <figcaption><b>شكل 3:</b> قائمة السجلات: الوقت، والمشروع، والحدث، والعملية، والخطورة، والفاعل، والكيان.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h2><span class="n">8</span>تفاصيل السجل</h2>
+  <p>فتح أي سجل يعرض الحدث ووقته (بتوقيت UTC، ووقت وقوعه ووقت استلامه منفصلين)، والفاعل وعنوانه، والكيان المتأثر، والقيم قبل التغيير وبعده.</p>
+  <figure><div class="frame"><img src="img/log-view-uid.jpg" alt=""></div>
+    <figcaption><b>شكل 4:</b> سجل تعديل حساب بنكي لموظف: كل البيانات للقراءة فقط.</figcaption></figure>
+
+  <h2><span class="n">9</span>الدخول والمصادقة الثنائية</h2>
+  <p>الدخول بالبريد وكلمة مرور قوية، وبعد 5 محاولات خاطئة يُقفل الحساب مؤقتًا. والأدوار العليا تحتاج خطوة ثانية:</p>
+  <div class="cards three">
+    <div class="card"><h4>رمز متغير</h4><p>رمز من 6 أرقام يتغير كل 30 ثانية (TOTP)، من أي تطبيق مجاني: Google أو Microsoft Authenticator أو كلمات السر في الآيفون.</p></div>
+    <div class="card"><h4>سر مشفّر</h4><p>عند التفعيل يتولد سر لكل حساب يُمسح كرمز QR، ويُحفظ مشفّرًا. لا رسائل SMS ولا اتصال خارجي.</p></div>
+    <div class="card"><h4>رموز استرداد</h4><p>تُعطى مرة واحدة لاستخدامها إن ضاع الجوال، وكل رمز يعمل مرة واحدة.</p></div>
+  </div>
+  <figure class="narrow"><div class="frame"><img src="img/mfa.jpg" alt=""></div>
+    <figcaption><b>شكل 5:</b> خطوة التحقق الثانية بعد كلمة المرور.</figcaption></figure>
+</section>
+
+<section>
+  <h2><span class="n">10</span>الأمان والمتابعة</h2>
+  <table>
+    <tr><th style="width:24%">الصفحة</th><th>ما تعرضه</th></tr>
+    <tr><td>المحاولات المرفوضة</td><td>كل طلب رُفض: مفتاح خاطئ أو ملغى، توقيع غير صحيح، طلب مكرر، عنوان غير مسموح، تجاوز الحد. مع السبب والعنوان والوقت.</td></tr>
+    <tr><td>تدقيق المنصة</td><td>من أنشأ أو ألغى مفتاحًا، ومن غيّر صلاحية، ومن صدّر سجلات، ومن طلب استعادة.</td></tr>
+    <tr><td>الأدوار والصلاحيات</td><td>مصفوفة صلاحيات واضحة، ولا يستطيع أحد منح صلاحية لا يملكها، ومراجعة دورية للصلاحيات كل 3 أشهر.</td></tr>
+    <tr><td>النسخ الاحتياطي</td><td>آخر النسخ ونتيجتها وحجمها، وزر نسخ فوري، وطلب استعادة مشروع من الأرشيف.</td></tr>
+  </table>
+  <figure><div class="frame"><img src="img/security.jpg" alt=""></div>
+    <figcaption><b>شكل 6:</b> المحاولات المرفوضة: يُخزَّن عدد محدود لكل عنوان في الدقيقة حتى لا يُغرق الهجوم القاعدة، ويصدر تنبيه عند التكرار.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h2><span class="n">11</span>الاحتفاظ والنسخ الاحتياطي</h2>
+  <div class="cards">
+    <div class="card"><h4>مدة الاحتفاظ</h4><p>لكل مشروع مدته، وبحد أقصى موحّد للمنصة (13 شهرًا). القديم يُؤرشف ثم يُحذف بعد فترة سماح 7 أيام.</p></div>
+    <div class="card"><h4>الأرشيف</h4><p>ملفات مضغوطة لكل مشروع وشهر، مع بصمة SHA-256 للتحقق. يمكن استعادة سجلات مشروع واحد منه عند الطلب، وتبقى محمية 30 يومًا.</p></div>
+    <div class="card"><h4>النسخ</h4><p>نسخة كاملة يوميًا، وتزايدية كل ساعة، وسجلات القاعدة الثنائية باستمرار. كلها مشفّرة، وتُرفع خارج الخادم وتُطابَق بعد الرفع.</p></div>
+    <div class="card"><h4>اختبار الاستعادة</h4><p>أسبوعيًا تُستعاد آخر نسخة في خادم مؤقت ويُتحقق من الجداول وعدد السجلات، ويُكتب تقرير. وأقصى فقد للبيانات ساعة.</p></div>
+  </div>
+  <figure><div class="frame"><img src="img/backups.jpg" alt=""></div>
+    <figcaption><b>شكل 7:</b> سجل عمليات النسخ والأرشفة واختبار الاستعادة.</figcaption></figure>
+</section>
+
+<section class="page">
+  <h2><span class="n">12</span>الواجهة وفق «كود المنصات»</h2>
+  <p>طُبّقت أساسات «كود المنصات»، نظام التصميم الموحد من هيئة الحكومة الرقمية، على اللوحة: الأخضر السعودي <span class="mono">#1B8354</span> لونًا أساسيًا، ورماديات الكود وألوان حالاته، وخط IBM Plex Sans Arabic، وزوايا 8px، وإطار تركيز ظاهر لمن يستخدم لوحة المفاتيح. واللوحة تدعم الوضع الداكن.</p>
+  <p class="note">الختم الرقمي للمواقع الحكومية يُضاف عند نشر المنصة على نطاق حكومي مسجَّل، فهي حاليًا أداة داخلية.</p>
+
+  <h2><span class="n">13</span>كيف تفحصون المنتج</h2>
+  <p>أُعدّت بيئة تجريبية ببيانات مبسّطة: أربعة أنظمة (شؤون الطلاب، الموارد البشرية، البوابة الإلكترونية، المشتريات)، ونحو 800 سجل على أسبوعين، وحساب جاهز لكل دور (<span class="mono">admin@demo.test</span>، <span class="mono">auditor@demo.test</span>، <span class="mono">security@demo.test</span>، <span class="mono">owner@demo.test</span>، <span class="mono">viewer@demo.test</span>). تُنشأ بأمر واحد: <span class="mono">make demo</span>، ويمكن إعادة ضبطها من البداية في أي وقت بـ <span class="mono">make fresh</span> ثم <span class="mono">make demo</span>.</p>
+  <table>
+    <tr><th style="width:22%">الدور</th><th>ما نرجو التركيز عليه</th></tr>
+    <tr><td>مدير المنصة</td><td>وضوح إنشاء مشروع ومفتاح وتجربة السجل التجريبي، وإدارة المستخدمين.</td></tr>
+    <tr><td>مدقق المنصة</td><td>كفاية البحث والتصفية، ووضوح تفاصيل السجل، وصيغة التصدير.</td></tr>
+    <tr><td>مسؤول الأمن</td><td>وضوح أسباب الرفض، وكفاية التنبيهات.</td></tr>
+    <tr><td>مالك المشروع</td><td>إدارة المفاتيح (تدوير، إلغاء، تقييد IP) ودليل الربط.</td></tr>
+    <tr><td>فريق النظام المتصل</td><td>سهولة الربط من الأمثلة، ووضوح رسائل الخطأ في الـ API.</td></tr>
+  </table>
+
+  <h2><span class="n">14</span>صيغة الملاحظة المقترحة</h2>
+  <table>
+    <tr><th>الشاشة</th><th>الملاحظة</th><th>المقترح</th><th style="width:14%">الأهمية</th></tr>
+    <tr><td>سجلات التدقيق: التصفية</td><td>—</td><td>—</td><td><span class="tag">متوسطة</span></td></tr>
+    <tr><td>—</td><td>—</td><td>—</td><td><span class="tag gray">—</span></td></tr>
+  </table>
+
+  <h2><span class="n">15</span>ملخص تنفيذي</h2>
+  <div class="summary">
+    <p><b>منصة سجلات التدقيق المركزية</b> تجمع أثر كل إجراء مهم في أنظمة الجهة في مكان واحد: الأنظمة ترسل، والمنصة تتحقق وتحفظ بشكل لا يُعدَّل ولا يُحذف، والمستخدمون يبحثون ويصدّرون كلٌّ في حدود صلاحيته.</p>
+    <p>صُمّمت على قاعدتين: <b>الحماية قبل الراحة</b> (منع التعديل في قاعدة البيانات نفسها، ومصادقة ثنائية، وتشفير النسخ، وتسجيل كل رفض وكل إجراء إداري)، و<b>البساطة لمن يربط</b> (مفتاح وطلب واحد، وأمثلة جاهزة، وحزمة Laravel). وكل ذلك بأدوات مجانية مفتوحة المصدر.</p>
+  </div>
+</section>
+
+</body>
+</html>

@@ -15,6 +15,9 @@ return [
         'organization' => env('AUDIT_ORGANIZATION_NAME', ''),
     ],
 
+    // Password of the *@demo.test accounts created by `make demo` (dev only).
+    'demo_password' => env('DEMO_PASSWORD', 'Demo!Passw0rd#2026'),
+
     'retention' => [
         // D3: platform-wide ceiling. No project may keep logs longer than this.
         // Monthly partitions that are entirely older than this are archived

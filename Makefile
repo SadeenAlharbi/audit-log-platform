@@ -32,6 +32,9 @@ fresh: ## Rebuild the schema from scratch (dev only, before the first deploy)
 seed: ## Run the (idempotent) seeders
 	$(APP) php artisan db:seed --force
 
+demo: ## Demo data for reviewers: 4 systems, ~800 logs, one account per role (dev only)
+	$(APP) php artisan db:seed --class=DemoSeeder --force
+
 partitions: ## List audit_logs partitions and add upcoming months
 	$(APP) php artisan audit:partitions
 
@@ -53,4 +56,4 @@ doctor: ## Run every check and save the report to storage/logs/doctor.log
 backup-full: ## Take a full database backup now
 	$(COMPOSE) run --rm backup full
 
-.PHONY: help setup up down ps logs shell migrate fresh seed partitions test lint analyse schema-dump doctor backup-full
+.PHONY: help setup up down ps logs shell migrate fresh seed demo partitions test lint analyse schema-dump doctor backup-full

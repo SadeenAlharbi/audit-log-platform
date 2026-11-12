@@ -55,6 +55,7 @@
 ```bash
 make help        # كل الأوامر
 make ps          # حالة الخدمات والـ healthchecks
+make demo        # بيانات تجريبية للمراجعة: 4 أنظمة وحساب لكل دور (التطوير فقط)
 make test        # الاختبارات (قاعدة audit_testing)
 make lint        # Pint
 make analyse     # PHPStan / Larastan مستوى 6
@@ -97,13 +98,14 @@ curl -X POST https://audit.example.com/api/v1/logs \
 | [docs/decisions.md](docs/decisions.md) | القرارات التقنية وأسبابها |
 | [docs/security-review.md](docs/security-review.md) | المراجعة الأمنية النهائية |
 | [docs/plan-compliance.md](docs/plan-compliance.md) | كل متطلب في وثيقة الخطة، وأين نُفّذ، وكيف اختُبر |
+| [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | الوثيقة التعريفية بالمنتج: الهدف، والأدوار، ورحلة السجل، والشاشات |
 | [docs/reports/](docs/reports/) | تقارير اختبار الاستعادة |
 
 ---
 
 ## الجودة
 
-- **Pest:** 188 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
+- **Pest:** 190 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
 - **التغطية:** طبقة الـ API 95% والمشروع كله 90% (الحد الأدنى 80%، ويفرضه `bin/coverage-api` في CI).
 - **Pint + PHPStan مستوى 6:** بدون أخطاء.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml)، يشغّل كل الفحوص داخل Docker، ويبني صور الإنتاج، ويفحص ملف OpenAPI.

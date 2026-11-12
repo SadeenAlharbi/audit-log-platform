@@ -36,3 +36,25 @@ it('echoes the client request id', function () {
 it('serves the OpenAPI document', function () {
     $this->get('/api/v1/openapi.yaml')->assertOk()->assertSee('openapi: 3.1.0', false);
 });
+
+it('throttles unauthenticated floods per IP before checking keys', function () {
+    config(['audit.security.ip_rate_limit_per_minute' => 3]);
+
+    foreach (range(1, 3) as $i) {
+        $this->postJson('/api/v1/logs', [])->assertStatus(401);
+    }
+
+    $this->postJson('/api/v1/logs', [])
+        ->assertStatus(429)
+        ->assertJsonPath('error.code', 'rate_limited');
+});
+
+it('stores a bounded number of security events per IP and minute', function () {
+    config(['audit.security.max_events_per_minute' => 2]);
+
+    foreach (range(1, 5) as $i) {
+        $this->postJson('/api/v1/logs', [])->assertStatus(401);
+    }
+
+    expect(SecurityEvent::query()->count())->toBe(2);
+});

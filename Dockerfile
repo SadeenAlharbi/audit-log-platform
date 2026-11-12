@@ -73,7 +73,7 @@ COPY --from=assets /app/public/build ./public/build
 
 RUN composer dump-autoload --optimize --classmap-authoritative --no-dev \
     && php artisan package:discover --ansi \
-    && mkdir -p storage/app/backup-spool storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
+    && mkdir -p storage/app/private storage/app/public storage/app/backup-spool storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
     && chown -R www-data:www-data storage bootstrap/cache
 
 USER www-data

@@ -26,7 +26,7 @@ set_env() { # set_env KEY VALUE  (replaces the line in .env)
 if [ ! -f .env ]; then
     say "Creating .env with random secrets"
     cp .env.docker.example .env
-    for key in DB_PASSWORD DB_ROOT_PASSWORD DB_ARCHIVER_PASSWORD DB_BACKUP_PASSWORD AWS_SECRET_ACCESS_KEY; do
+    for key in DB_PASSWORD DB_MAINTENANCE_PASSWORD DB_ROOT_PASSWORD DB_ARCHIVER_PASSWORD DB_BACKUP_PASSWORD AWS_SECRET_ACCESS_KEY; do
         if grep -qE "^${key}=change-me" .env; then
             set_env "$key" "$(openssl rand -hex 24)"
         fi

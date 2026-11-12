@@ -16,6 +16,7 @@ use App\Models\PlatformAudit;
 use App\Models\Project;
 use App\Models\ProjectApiKey;
 use App\Models\User;
+use App\Services\Export\AuditLogExporter;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
@@ -187,4 +188,12 @@ it('lists the main resources', function () {
     Livewire::test(ListUsers::class)->assertOk();
     Livewire::test(ListRoles::class)->assertOk();
     Livewire::test(ListPlatformAudits::class)->assertOk();
+});
+
+it('neutralises spreadsheet formulas in CSV exports', function () {
+    expect(AuditLogExporter::csvCell('=HYPERLINK("http://x")'))->toBe('\'=HYPERLINK("http://x")')
+        ->and(AuditLogExporter::csvCell('+cmd|calc!A0'))->toBe("'+cmd|calc!A0")
+        ->and(AuditLogExporter::csvCell('@SUM(1)'))->toBe("'@SUM(1)")
+        ->and(AuditLogExporter::csvCell('order.paid'))->toBe('order.paid')
+        ->and(AuditLogExporter::csvCell(42))->toBe(42);
 });

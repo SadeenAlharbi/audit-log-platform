@@ -36,7 +36,22 @@ class TrackDashboardLogins
             : User::query()->where('email', $event->credentials['email'] ?? null)->first();
 
         if ($user === null) {
-            $this->audit->record('auth.login_failed', 'unknown_user', ['email' => mb_substr((string) ($event->credentials['email'] ?? ''), 0, 191)]);
+            // Security review M5: what was typed may be a mistyped password,
+            // and platform_audit is immutable - keep only a keyed hash so
+            // repeated attempts on the same value can still be correlated.
+            $typed = mb_strtolower(trim((string) ($event->credentials['email'] ?? '')));
+            $this->audit->record('auth.login_failed', 'unknown_user', [
+                'identifier_hash' => substr(hash_hmac('sha256', $typed, (string) config('app.key')), 0, 16),
+                'ip' => request()->ip(),
+            ]);
+
+            return;
+        }
+
+        // An account that is already locked is not locked again: repeated
+        // attempts cannot extend the lockout indefinitely.
+        if ($user->isLocked()) {
+            $this->audit->record('auth.login_failed', $user, ['locked' => true, 'ip' => request()->ip()]);
 
             return;
         }
@@ -50,7 +65,7 @@ class TrackDashboardLogins
             'locked_until' => $lock ? now()->addMinutes((int) config('audit.accounts.lockout_minutes', 15)) : $user->locked_until,
         ])->saveQuietly();
 
-        $this->audit->record($lock ? 'auth.account_locked' : 'auth.login_failed', $user, ['attempts' => $attempts]);
+        $this->audit->record($lock ? 'auth.account_locked' : 'auth.login_failed', $user, ['attempts' => $attempts, 'ip' => request()->ip()]);
     }
 
     private function login(Login $event): void

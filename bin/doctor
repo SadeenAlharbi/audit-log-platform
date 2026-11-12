@@ -46,6 +46,7 @@ if ! grep -qE '^APP_KEY=.+' .env; then
     step "key:generate" docker compose exec -T app php artisan key:generate --force
 fi
 
+step "runtime DB grants (must not include ALTER/DROP/TRIGGER on the app database)" docker compose exec -T mariadb sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "SHOW GRANTS FOR \`$DB_USERNAME\`@\`%\`"'
 step "about" docker compose exec -T app php artisan about --only=environment,drivers
 step "migrate --seed" docker compose exec -T app php artisan migrate --seed --force
 step "partitions" docker compose exec -T app php artisan audit:partitions

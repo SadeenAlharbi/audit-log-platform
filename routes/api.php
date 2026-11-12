@@ -21,7 +21,7 @@ Route::prefix('v1')->middleware(['api.json'])->group(function () {
     Route::get('openapi.yaml', fn () => response((string) file_get_contents(base_path('docs/openapi.yaml')), 200, ['Content-Type' => 'application/yaml; charset=UTF-8']))
         ->name('api.v1.openapi');
 
-    Route::middleware(['api.https', 'api.payload', 'api.key', 'api.signature', 'throttle:audit-api'])->group(function () {
+    Route::middleware(['api.throttle-ip', 'api.https', 'api.payload', 'api.key', 'api.signature', 'throttle:audit-api'])->group(function () {
         Route::post('logs', [LogIngestController::class, 'store'])
             ->middleware('api.scope:logs:write')
             ->name('api.v1.logs.store');

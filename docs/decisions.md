@@ -94,9 +94,9 @@
 ## D6: ملاحظات إضافية ظهرت أثناء التصميم
 
 1. **`hmac_secret` لا يمكن تخزينه كـ hash.** الخادم يحتاج قراءته للتحقق من `X-Signature`. لذلك يُخزَّن **مشفّرًا** بـ `APP_KEY`، بينما مفتاح الـ API نفسه يُخزَّن كـ SHA-256 فقط. أي تسريب لـ `APP_KEY` يكشف أسرار HMAC، فيجب حمايته.
-2. **الـ Triggers لا تمنع كل شيء.** `TRUNCATE` و`ALTER TABLE ... DROP PARTITION` لا تُشغّل الـ Triggers.
-   - **محسوم:** الـ Runbook (القسم 1.4) يفصل في الإنتاج بين حساب التشغيل (`SELECT, INSERT, UPDATE, DELETE`، والـ Triggers تمنع التعديل والحذف على الجداول المحمية) وحساب الـ Migrations والصيانة.
-   - في التطوير حساب واحد.
+2. **الـ Triggers لا تمنع كل شيء.** `TRUNCATE` و`ALTER TABLE ... DROP PARTITION` لا تُشغّل الـ Triggers، والحساب الذي يملك صلاحية `TRIGGER` يستطيع حذفها.
+   - **محسوم:** حساب التشغيل `audit_app` ينشأ بصلاحيات `SELECT, INSERT, UPDATE, DELETE` فقط، في التطوير والإنتاج. الـ Migrations وصيانة الأقسام تعمل على اتصال `maintenance` بحساب منفصل (Runbook §1.4).
+   - مختبر: `TRUNCATE` و`DROP TRIGGER` من حساب التطبيق يُرفضان.
 3. **`log_bin_trust_function_creators = 1`.** مطلوب لأن الـ Binary Logs مفعّلة، وبدونه يفشل إنشاء الـ Triggers من حساب التطبيق.
 4. **نافذة `occurred_at`.** **منفّذ:** يُرفض أي `occurred_at` أقدم من الحد الأقصى للاحتفاظ، أو أبعد من 5 دقائق في المستقبل (`LogPayloadRules`).
 5. **ضغط الصفحات (`PAGE_COMPRESSED`).** مفعّل على `audit_logs`. لو رفضه الخادم لأي سبب، الـ Migration ينشئ الجدول بدونه ويطبع تحذيرًا واضحًا بدل أن يفشل.

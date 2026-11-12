@@ -98,8 +98,8 @@ curl -X POST https://audit.example.com/api/v1/logs \
 
 ## الجودة
 
-- **Pest:** 146 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
-- **التغطية:** طبقة الـ API فوق 90% (الحد الأدنى 80%، ويفرضه `bin/coverage-api` في CI).
+- **Pest:** 181 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
+- **التغطية:** طبقة الـ API 95% والمشروع كله 90% (الحد الأدنى 80%، ويفرضه `bin/coverage-api` في CI).
 - **Pint + PHPStan مستوى 6:** بدون أخطاء.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml)، يشغّل كل الفحوص داخل Docker، ويبني صور الإنتاج، ويفحص ملف OpenAPI.
 

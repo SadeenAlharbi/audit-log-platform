@@ -64,7 +64,7 @@ class AuditLogExporter
                 $row = $this->row($log, $reveal);
 
                 if ($format === 'csv') {
-                    fputcsv($out, array_map(fn ($v) => is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE) : $v, $row), escape: '');
+                    fputcsv($out, array_map(fn ($v) => self::csvCell(is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE) : $v), $row), escape: '');
                 } else {
                     fwrite($out, ($first ? '' : ",\n").json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                     $first = false;
@@ -136,5 +136,19 @@ class AuditLogExporter
             'occurred_at' => $log->occurred_at->format('Y-m-d\TH:i:s.v\Z'),
             'received_at' => $log->received_at->format('Y-m-d\TH:i:s.v\Z'),
         ];
+    }
+
+    /**
+     * Security review M1: values come from source systems. A cell starting
+     * with = + - @ (or a tab / carriage return) is run as a formula by Excel
+     * and LibreOffice, so it is prefixed with an apostrophe (OWASP).
+     */
+    public static function csvCell(mixed $value): mixed
+    {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }

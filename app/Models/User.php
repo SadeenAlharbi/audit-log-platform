@@ -115,15 +115,41 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $this->forceFill(['app_authentication_recovery_codes' => $codes])->save();
     }
 
-    /** Plan §13: 2FA is mandatory for Super Admin and Security Officer. */
+    /**
+     * Plan §13: 2FA is mandatory for Super Admin and Security Officer.
+     * Security review L2: also for every other platform-wide role (e.g.
+     * Platform Auditor reads every project), and for anyone who may reveal
+     * masked data.
+     */
     public function requiresMultiFactorAuthentication(): bool
     {
-        return $this->hasAnyRole(config('audit.accounts.mfa_required_roles', []));
+        return $this->hasAnyRole(config('audit.accounts.mfa_required_roles', []))
+            || $this->roles->contains(fn ($role) => ($role->scope ?? 'platform') === 'platform')
+            || $this->canGlobally('logs.view_sensitive');
     }
 
     /* ---------------------------------------------------------------
      | Authorization helpers
      * --------------------------------------------------------------- */
+
+    /**
+     * Names of the permissions this user holds platform-wide.
+     *
+     * @return list<string>
+     */
+    public function globalPermissionNames(): array
+    {
+        return $this->is_active ? $this->getAllPermissions()->pluck('name')->values()->all() : [];
+    }
+
+    /**
+     * Security review M6: true when this user holds every platform permission
+     * of $other, so managing $other cannot be used to gain more power.
+     */
+    public function covers(User $other): bool
+    {
+        return array_diff($other->getAllPermissions()->pluck('name')->all(), $this->globalPermissionNames()) === [];
+    }
 
     /** Permission granted by a platform role (applies to every project). */
     public function canGlobally(string $permission): bool

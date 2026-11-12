@@ -83,7 +83,9 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 // Signs out users deactivated or locked during their session.
+                // Persistent (security review L1): also applied to Livewire
+                // update requests, not only to full page loads.
                 Authenticate::class,
-            ]);
+            ], isPersistent: true);
     }
 }

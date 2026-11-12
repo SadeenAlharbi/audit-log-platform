@@ -81,7 +81,11 @@ it('validates query parameters', function () {
 });
 
 it('returns times in UTC ISO-8601', function () {
-    makeAuditLog($this->project, ['occurred_at' => CarbonImmutable::parse('2026-01-01 10:00:00.123', 'UTC')->setDate(now()->year, now()->month, now()->day)]);
+    // An hour ago (never in the future, whatever time the suite runs), at
+    // a known minute/second/millisecond.
+    $at = CarbonImmutable::now('UTC')->subHour()->setTime((int) now('UTC')->subHour()->format('H'), 0, 0, 123000);
+    makeAuditLog($this->project, ['occurred_at' => $at]);
 
-    expect(sendApi($this, $this->reader, 'GET', '/api/v1/logs')->json('data.0.occurred_at'))->toMatch('/^\d{4}-\d{2}-\d{2}T10:00:00\.123Z$/');
+    expect(sendApi($this, $this->reader, 'GET', '/api/v1/logs')->json('data.0.occurred_at'))
+        ->toBe($at->format('Y-m-d\TH').':00:00.123Z');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Roles\Schemas;
 
+use App\Models\User;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
@@ -51,9 +52,14 @@ class RoleForm
      */
     public static function selectedPermissions(array $data): array
     {
+        // Security review M6: a role can only receive permissions the editor
+        // holds, whatever the submitted form contains.
+        $grantable = auth()->user() instanceof User ? auth()->user()->globalPermissionNames() : [];
+
         return collect($data)
             ->filter(fn ($v, $k) => str_starts_with((string) $k, 'permissions_') && is_array($v))
             ->flatten()
+            ->filter(fn ($name) => in_array($name, $grantable, true))
             ->values()
             ->all();
     }

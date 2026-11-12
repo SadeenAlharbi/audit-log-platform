@@ -37,7 +37,8 @@ cp .env.docker.example .env
 | `APP_ENV` / `APP_DEBUG` | `production` / `false` |
 | `APP_URL` | `https://audit.example.com` |
 | `APP_KEY` | `docker run --rm audit-log-platform/app php artisan key:generate --show` بعد البناء |
-| `TRUSTED_PROXIES` | عناوين الـ proxy |
+| `TRUSTED_PROXIES` | عناوين الـ proxy **بالتحديد**. لا تستخدم `*` إلا إذا كان التطبيق لا يُوصَل إليه إلا عبر الـ proxy، لأن قوائم IP للمفاتيح تعتمد على `X-Forwarded-For` |
+| `SESSION_SECURE_COOKIE` | `true` (كوكي الجلسة عبر HTTPS فقط). وفعّل HSTS على الـ proxy: `Strict-Transport-Security: max-age=31536000` |
 | `LOG_LEVEL` | `info` |
 | `TELESCOPE_ENABLED` | `false` (الحزمة غير موجودة أصلًا في صورة الإنتاج) |
 | `DB_*_PASSWORD`, `AWS_SECRET_ACCESS_KEY` | أسرار عشوائية قوية: `openssl rand -hex 24` |
@@ -65,18 +66,22 @@ grep 'public key' backup-age-identity.txt    # تضعه في BACKUP_AGE_RECIPIEN
 
 **المفتاح الخاص لا يبقى على الخادم.** يُحفظ في خزنة أسرار الشركة (Vault أو مدير كلمات مرور) مع نسخة ثانية لدى مسؤول آخر. بدونه لا يمكن استعادة أي نسخة مشفّرة.
 
-### 1.4 تقوية قاعدة البيانات في الإنتاج
+### 1.4 حسابات قاعدة البيانات (تلقائية)
 
-1. **فصل حساب الـ Migrations عن حساب التشغيل** (decisions D6-2):
-   - أنشئ `audit_migrator` بكل الصلاحيات، واستخدمه فقط لـ `migrate` (`DB_USERNAME=audit_migrator dc exec app php artisan migrate --force`).
-   - حساب التطبيق `audit_app` يكفيه:
-     ```sql
-     GRANT SELECT, INSERT, UPDATE, DELETE ON audit_log.* TO 'audit_app'@'%';
-     ```
-     الـ Triggers تمنع UPDATE وDELETE على الجداول المحمية.
-   - `ALTER` على `audit_logs` (لإضافة الأقسام وحذفها) يُمنح لحساب منفصل يشغّل `audit:partitions` و`audit:prune` فقط، أو يُنفَّذان بحساب الـ migrator من الـ scheduler.
-2. لا يوجد منفذ لقاعدة البيانات على الخادم (`ports: !reset []` في `docker-compose.prod.yml`).
-3. `innodb_buffer_pool_size` يُضبط على 60–70% من الذاكرة في `docker/mariadb/conf.d/audit.cnf`.
+ينشئها `docker/mariadb/init/01-users.sh` عند أول تشغيل، بنفس الشكل في التطوير والإنتاج:
+
+| الحساب | الصلاحيات | يستخدمه |
+|---|---|---|
+| `audit_app` (`DB_USERNAME`) | `SELECT, INSERT, UPDATE, DELETE` فقط. بدون `ALTER` أو `DROP` أو `TRIGGER`، فلا يستطيع تعطيل الـ Triggers ولا `TRUNCATE` ولا حذف قسم | التطبيق والطوابير |
+| `audit_maintenance` (`DB_MAINTENANCE_USERNAME`) | كل الصلاحيات على قاعدة التطبيق | `migrate` (تلقائيًا: أوامر الـ schema تعمل على اتصال `maintenance`)، وإنشاء وحذف الأقسام في `audit:partitions` و`audit:prune` |
+| `audit_archiver` | `SELECT, DELETE`، والـ Trigger لا يسمح بالحذف لغيره | الحذف حسب مدة الاحتفاظ |
+| `audit_backup` | `RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR` + قراءة | mariadb-backup |
+
+`./bin/doctor` يعرض صلاحيات حساب التطبيق للتأكد.
+
+**تقوية إضافية:**
+- لا يوجد منفذ لقاعدة البيانات على الخادم (`ports: !reset []` في `docker-compose.prod.yml`).
+- `innodb_buffer_pool_size` يُضبط على 60–70% من الذاكرة في `docker/mariadb/conf.d/audit.cnf`.
 
 ### 1.5 التحديثات
 

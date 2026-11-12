@@ -84,6 +84,26 @@ return [
             ]) : [],
         ],
 
+        // Schema changes and partition maintenance (migrate, audit:partitions,
+        // DROP PARTITION in audit:prune). The runtime account (DB_USERNAME)
+        // has no ALTER / DROP / TRIGGER privilege, so it cannot disable the
+        // append-only triggers or drop data (security review H1).
+        'maintenance' => [
+            'driver' => 'mariadb',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_MAINTENANCE_USERNAME', env('DB_USERNAME')),
+            'password' => env('DB_MAINTENANCE_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         // Development only: Laravel Telescope storage (config/telescope.php).
         'telescope' => [
             'driver' => 'sqlite',

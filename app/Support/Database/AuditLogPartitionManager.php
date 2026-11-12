@@ -27,9 +27,16 @@ final class AuditLogPartitionManager
 
     public const FUTURE = 'p_future';
 
-    public function __construct(private ?ConnectionInterface $connection = null)
+    private ConnectionInterface $connection;
+
+    /**
+     * Partition DDL needs ALTER, which only the maintenance account has
+     * (security review H1). A connection *name* is taken, not an instance,
+     * so the container cannot inject the default (runtime) connection.
+     */
+    public function __construct(?string $connection = null)
     {
-        $this->connection ??= DB::connection();
+        $this->connection = DB::connection($connection ?? (string) config('audit.maintenance_connection', 'maintenance'));
     }
 
     /**

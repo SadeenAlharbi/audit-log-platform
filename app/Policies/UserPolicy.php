@@ -21,9 +21,15 @@ class UserPolicy
         return $user->canGlobally('users.manage');
     }
 
+    /**
+     * Security review M6: changing someone's email, password or 2FA is a
+     * takeover of their account, so it is only allowed on users who hold no
+     * permission the manager lacks (a user manager cannot take over a
+     * Super Admin).
+     */
     public function update(User $user, User $model): bool
     {
-        return $user->canGlobally('users.manage');
+        return $user->canGlobally('users.manage') && ($user->is($model) || $user->covers($model));
     }
 
     /** Users are deactivated, never deleted (they are referenced by the audit trail). */
@@ -39,6 +45,6 @@ class UserPolicy
 
     public function assignRoles(User $user, User $model): bool
     {
-        return $user->canGlobally('roles.manage') && ! $user->is($model);
+        return $user->canGlobally('roles.manage') && ! $user->is($model) && $user->covers($model);
     }
 }

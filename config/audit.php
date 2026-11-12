@@ -39,6 +39,9 @@ return [
         'page_compression' => (bool) env('AUDIT_PAGE_COMPRESSION', true),
     ],
 
+    // Connection with ALTER privileges used for partition maintenance.
+    'maintenance_connection' => env('DB_MAINTENANCE_CONNECTION', 'maintenance'),
+
     'archiver' => [
         // MariaDB account allowed by the triggers to DELETE archived rows.
         // Must match DB_ARCHIVER_USERNAME used by the "archiver" connection.
@@ -120,9 +123,9 @@ return [
         'replacement' => '********',
         'redacted' => '[REDACTED]',
         'never_store' => [
-            'password', 'passwd', 'secret', 'token', 'api_key', 'apikey',
-            'authorization', 'private_key', 'otp', 'pin',
-            'card_number', 'cardnumber', 'pan', 'cvv', 'cvc',
+            'password', 'passwd', 'pwd', 'passphrase', 'secret', 'token', 'api_key', 'apikey',
+            'authorization', 'credential', 'credentials', 'cookie', 'jwt', 'private_key', 'otp', 'pin',
+            'card_number', 'cardnumber', 'credit_card', 'pan', 'cvv', 'cvc',
         ],
         'keys' => [
             'iban', 'ssn', 'national_id', 'nationalid', 'iqama', 'passport',
@@ -138,6 +141,12 @@ return [
     'security' => [
         'alert_threshold' => (int) env('AUDIT_SECURITY_ALERT_THRESHOLD', 20),
         'alert_window_minutes' => 5,
+        // Events stored per IP and reason per minute; the rest are counted.
+        'max_events_per_minute' => (int) env('AUDIT_SECURITY_MAX_EVENTS_PER_MINUTE', 30),
+        // Requests per minute per client IP before any authentication.
+        'ip_rate_limit_per_minute' => (int) env('AUDIT_API_IP_RATE_LIMIT', 3000),
+        // security_events older than this are deleted by audit:prune.
+        'events_retention_days' => (int) env('AUDIT_SECURITY_EVENTS_RETENTION_DAYS', 365),
     ],
 
     /*

@@ -46,6 +46,30 @@ it('locks a dashboard account after 5 failed logins', function () {
         ->and(PlatformAudit::query()->where('action', 'auth.account_locked')->exists())->toBeTrue();
 });
 
+it('does not extend a lockout while the account is locked', function () {
+    $user = User::factory()->create(['email' => 'x@example.com']);
+    foreach (range(1, 5) as $i) {
+        event(new Failed('web', $user, ['email' => 'x@example.com']));
+    }
+    $lockedUntil = $user->fresh()->locked_until;
+
+    $this->travel(5)->minutes();
+    foreach (range(1, 10) as $i) {
+        event(new Failed('web', $user->fresh(), ['email' => 'x@example.com']));
+    }
+
+    expect($user->fresh()->locked_until->equalTo($lockedUntil))->toBeTrue();
+});
+
+it('never stores what was typed for an unknown account', function () {
+    event(new Failed('web', null, ['email' => 'MyS3cretPassw0rd']));
+
+    $entry = PlatformAudit::query()->where('action', 'auth.login_failed')->latest('id')->firstOrFail();
+
+    expect(json_encode($entry->changes))->not->toContain('MyS3cretPassw0rd')
+        ->and($entry->changes['identifier_hash'])->toHaveLength(16);
+});
+
 it('records role assignments in platform_audit', function () {
     $user = platformUser('platform_auditor');
 

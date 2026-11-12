@@ -38,6 +38,11 @@ class AppFilesBackup
                 '-C', base_path(), '.env', 'storage/app']);
 
             $recipient = config('audit.backup.age_recipient');
+            // Security review M7: .env holds APP_KEY (which decrypts the HMAC
+            // and 2FA secrets): never ship it unencrypted outside development.
+            if (blank($recipient) && ! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException('BACKUP_AGE_RECIPIENT is not set: refusing to write an unencrypted backup.');
+            }
             $final = $archive;
             if (filled($recipient)) {
                 $final = $archive.'.age';

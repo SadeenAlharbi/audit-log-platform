@@ -16,13 +16,17 @@ use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\QueueBusy;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Events\PermissionAttachedEvent;
@@ -42,9 +46,17 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Role::class, RolePolicy::class);
 
+        // Security review M2/L3: in production every generated URL (reset
+        // links, signed URLs) uses APP_URL over HTTPS, whatever the request.
+        if ($this->app->environment('production')) {
+            URL::forceRootUrl((string) config('app.url'));
+            URL::forceScheme('https');
+        }
+
         $this->configureRateLimiting();
         $this->configurePasswords();
         $this->registerAuditTrail();
+        $this->runSchemaCommandsOnMaintenanceConnection();
     }
 
     private function configureRateLimiting(): void
@@ -91,6 +103,35 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(JobFailed::class, function (JobFailed $event) {
             Log::error('Queue job failed', ['job' => $event->job->resolveName(), 'error' => $event->exception->getMessage()]);
+        });
+    }
+
+    /**
+     * Security review H1: the runtime database account cannot ALTER, DROP or
+     * manage triggers. Schema commands (migrate, db:wipe, schema:dump)
+     * therefore run on the "maintenance" connection, so `php artisan migrate`
+     * keeps working without granting those privileges to the app.
+     */
+    private function runSchemaCommandsOnMaintenanceConnection(): void
+    {
+        $commands = ['migrate', 'migrate:fresh', 'migrate:refresh', 'migrate:reset', 'migrate:rollback',
+            'migrate:install', 'migrate:status', 'db:wipe', 'schema:dump'];
+        $previous = null;
+
+        Event::listen(CommandStarting::class, function (CommandStarting $event) use ($commands, &$previous) {
+            $maintenance = (string) config('audit.maintenance_connection', 'maintenance');
+            if (in_array($event->command, $commands, true) && $event->input->getParameterOption('--database') === false
+                && DB::getDefaultConnection() !== $maintenance) {
+                $previous = DB::getDefaultConnection();
+                DB::setDefaultConnection($maintenance);
+            }
+        });
+
+        Event::listen(CommandFinished::class, function (CommandFinished $event) use ($commands, &$previous) {
+            if ($previous !== null && in_array($event->command, $commands, true)) {
+                DB::setDefaultConnection($previous);
+                $previous = null;
+            }
         });
     }
 }

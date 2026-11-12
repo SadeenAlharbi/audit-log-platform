@@ -63,8 +63,12 @@ services:
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_DATABASE}
-      MARIADB_USER: ${DB_USERNAME}
-      MARIADB_PASSWORD: ${DB_PASSWORD}
+      # The image's own user is the maintenance (DDL) account; the init
+      # script adds the least-privilege runtime account DB_USERNAME.
+      MARIADB_USER: ${DB_MAINTENANCE_USERNAME:-audit_maintenance}
+      MARIADB_PASSWORD: ${DB_MAINTENANCE_PASSWORD}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_TEST_DATABASE: ${DB_TEST_DATABASE:-audit_testing}
       DB_ARCHIVER_USERNAME: ${DB_ARCHIVER_USERNAME}
       DB_ARCHIVER_PASSWORD: ${DB_ARCHIVER_PASSWORD}

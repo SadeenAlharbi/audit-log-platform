@@ -67,6 +67,11 @@ ship() {
         out="$BACKUP_ROOT/artifacts/$name.gz"
         gzip -c "$src" > "$out"
     fi
+    if [ -z "$AGE_RECIPIENT" ] && [ "${ALLOW_UNENCRYPTED_BACKUPS:-false}" != "true" ]; then
+        rm -f "$out"
+        log "ERROR: AGE_RECIPIENT is not set - refusing to keep an unencrypted backup (set ALLOW_UNENCRYPTED_BACKUPS=true only for throwaway tests)"
+        return 1
+    fi
     if [ -n "$AGE_RECIPIENT" ]; then
         age -r "$AGE_RECIPIENT" -o "$out.age" "$out"
         rm -f "$out"

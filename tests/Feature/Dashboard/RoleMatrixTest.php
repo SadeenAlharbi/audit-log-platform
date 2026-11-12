@@ -125,3 +125,28 @@ it('loses project access when the project is archived', function () {
 
     expect($viewer->fresh()->can('view', $this->logA))->toBeFalse();
 });
+
+it('does not let a user manager take over a more privileged account', function () {
+    $manager = platformUser('platform_auditor');
+    $managerRole = Role::findOrCreate('user_manager', 'web');
+    $managerRole->syncPermissions(['users.manage', 'roles.manage']);
+    $manager->assignRole($managerRole);
+    $admin = platformUser('super_admin');
+    $viewer = projectUser($this->a, 'project_viewer');
+
+    expect($manager->can('update', $admin))->toBeFalse()
+        ->and($manager->can('assignRoles', $admin))->toBeFalse()
+        ->and($manager->can('update', $viewer))->toBeTrue()
+        // cannot edit a role they hold, nor one with permissions they lack
+        ->and($manager->can('update', $managerRole))->toBeFalse()
+        ->and($manager->can('update', Role::findByName('security_officer')))->toBeFalse()
+        ->and($manager->can('update', Role::findByName('project_viewer')))->toBeTrue();
+});
+
+it('requires 2FA for every platform-wide role, not for project members', function () {
+    expect(platformUser('super_admin')->requiresMultiFactorAuthentication())->toBeTrue()
+        ->and(platformUser('security_officer')->requiresMultiFactorAuthentication())->toBeTrue()
+        ->and(platformUser('platform_auditor')->requiresMultiFactorAuthentication())->toBeTrue()
+        ->and(projectUser($this->a, 'project_owner')->requiresMultiFactorAuthentication())->toBeFalse()
+        ->and(projectUser($this->a, 'project_viewer')->requiresMultiFactorAuthentication())->toBeFalse();
+});

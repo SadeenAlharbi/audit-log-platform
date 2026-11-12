@@ -32,6 +32,17 @@ class SecurityEventRecorder
     {
         $ip = (string) $request->ip();
 
+        // Security review M4: a flood of bad requests must not become a flood
+        // of INSERTs. The first N events per IP and reason each minute are
+        // stored; the rest are only counted (and still raise the alert).
+        $sampleKey = 'security:sample:'.sha1($ip.'|'.$reason).':'.now()->format('YmdHi');
+        Cache::add($sampleKey, 0, now()->addMinutes(2));
+        if ((int) Cache::increment($sampleKey) > (int) config('audit.security.max_events_per_minute', 30)) {
+            $this->maybeAlert($ip, $reason);
+
+            return;
+        }
+
         try {
             SecurityEvent::query()->create([
                 'project_id' => $project->id ?? $key->project_id ?? null,

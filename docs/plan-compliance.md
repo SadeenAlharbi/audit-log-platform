@@ -103,7 +103,7 @@
 | اختبارات سياسات الوصول في Filament | ✓ | `tests/Feature/Dashboard` |
 | Pint + PHPStan مستوى 6 | ✓ | بدون أخطاء |
 | CI داخل Docker | ✓ | `.github/workflows/ci.yml` |
-| تغطية 80%+ لطبقة الـ API | ✓ | `bin/coverage-api`: فوق 90% |
+| تغطية 80%+ لطبقة الـ API | ✓ | `bin/coverage-api`: 95.3% (والمشروع كله 90.3%) |
 
 ## §11 المراقبة
 
@@ -157,5 +157,5 @@
 | schema.sql/ERD + Migrations نظيفة | `database/schema/schema.sql`، `docs/schema.md` |
 | Runbook | `docs/runbook.md` |
 | مصفوفة الأدوار موثقة ومختبرة | `docs/permissions-matrix.md` + `RoleMatrixTest` |
-| تغطية 80%+ للـ API | `bin/coverage-api` (فوق 90%) |
+| تغطية 80%+ للـ API | `bin/coverage-api` (95.3%) |
 | تقرير اختبار استعادة ناجح | `docs/reports/restore-test-2026-11-11.md` |

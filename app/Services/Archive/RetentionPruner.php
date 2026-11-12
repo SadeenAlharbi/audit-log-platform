@@ -28,7 +28,7 @@ class RetentionPruner
     ) {}
 
     /**
-     * @return array{dropped_partitions: list<string>, deleted_rows: int, deleted_keys: int, skipped: list<string>}
+     * @return array{dropped_partitions: list<string>, deleted_rows: int, deleted_keys: int, skipped: list<string>, deleted_security_events?: int}
      */
     public function prune(?CarbonImmutable $now = null, bool $dryRun = false): array
     {
@@ -56,7 +56,8 @@ class RetentionPruner
 
             if (! $dryRun) {
                 $result['deleted_keys'] += $this->deleteKeys($archiver, null, $month->addMonth(), $batchSize);
-                DB::statement("ALTER TABLE audit_logs DROP PARTITION {$partition['name']}");
+                DB::connection((string) config('audit.maintenance_connection', 'maintenance'))
+                    ->statement("ALTER TABLE audit_logs DROP PARTITION {$partition['name']}");
             }
             $result['dropped_partitions'][] = $partition['name'];
         }
@@ -90,6 +91,13 @@ class RetentionPruner
 
         if (! $dryRun && ($result['deleted_rows'] > 0 || $result['dropped_partitions'] !== [])) {
             $this->audit->record('audit.pruned', 'audit_logs', [...$result, 'watermark' => $watermark]);
+        }
+
+        // security_events is not append-only: old rejections are simply removed.
+        if (! $dryRun) {
+            $result['deleted_security_events'] = DB::table('security_events')
+                ->where('created_at', '<', $now->subDays((int) config('audit.security.events_retention_days', 365))->format('Y-m-d H:i:s.v'))
+                ->delete();
         }
 
         return $result;

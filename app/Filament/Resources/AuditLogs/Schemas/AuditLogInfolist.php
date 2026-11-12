@@ -23,6 +23,7 @@ class AuditLogInfolist
                     TextEntry::make('event')->label('الحدث')->fontFamily('mono')->weight('bold'),
                     TextEntry::make('action')->label('العملية')->badge(),
                     TextEntry::make('severity')->label('الخطورة')->badge()
+                        ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
                         ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
                     TextEntry::make('project.name')->label('المشروع'),
                     TextEntry::make('occurred_at')->label('وقت الحدث (UTC)')->dateTime('Y-m-d H:i:s.v'),

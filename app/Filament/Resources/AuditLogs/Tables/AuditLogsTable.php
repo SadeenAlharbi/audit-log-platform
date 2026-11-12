@@ -17,6 +17,9 @@ use Illuminate\Support\Carbon;
 
 class AuditLogsTable
 {
+    /** @var array<string, string> */
+    public const SEVERITY_LABELS = ['info' => 'معلومة', 'warning' => 'تحذير', 'critical' => 'حرج'];
+
     public const SEVERITY_COLORS = ['info' => 'gray', 'warning' => 'warning', 'critical' => 'danger'];
 
     public static function configure(Table $table): Table
@@ -35,6 +38,7 @@ class AuditLogsTable
                 TextColumn::make('event')->label('الحدث')->searchable()->fontFamily('mono')->weight('medium'),
                 TextColumn::make('action')->label('العملية')->badge()->color('gray'),
                 TextColumn::make('severity')->label('الخطورة')->badge()
+                    ->formatStateUsing(fn (string $state) => self::SEVERITY_LABELS[$state] ?? $state)
                     ->color(fn (string $state) => self::SEVERITY_COLORS[$state] ?? 'gray'),
                 // Systems often send only actor type + id: show "user #42"
                 // when there is no name, and the type/id under the name.
@@ -74,7 +78,7 @@ class AuditLogsTable
                 SelectFilter::make('severity')
                     ->label('الخطورة')
                     ->multiple()
-                    ->options(['info' => 'info', 'warning' => 'warning', 'critical' => 'critical']),
+                    ->options(self::SEVERITY_LABELS),
 
                 Filter::make('details')
                     ->label('تفاصيل')

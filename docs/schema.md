@@ -99,9 +99,9 @@ erDiagram
 
 | الحساب | الصلاحيات | الاستخدام |
 |---|---|---|
-| `audit_app` | كل الصلاحيات على قاعدة التطبيق في التطوير. في الإنتاج: SELECT/INSERT/UPDATE/DELETE فقط (Runbook §1.4) | التطبيق |
+| `audit_app` | `SELECT, INSERT, UPDATE, DELETE, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE` (بدون DDL، في التطوير والإنتاج) | التطبيق |
 | `audit_archiver` | `SELECT, DELETE` | الأرشفة والحذف حسب مدة الاحتفاظ |
-| `audit_backup` | `RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR` + قراءة | Mariabackup |
+| `audit_backup` | `RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR` + `SELECT` فقط (لا يستطيع حذف الـ triggers) | Mariabackup |
 
 في الإنتاج يُفصل حساب الـ Migrations عن حساب التشغيل (D6-2).
 

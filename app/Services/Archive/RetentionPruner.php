@@ -55,7 +55,16 @@ class RetentionPruner
 
             $monthFrom = $month->format('Y-m-d H:i:s.v');
             $monthTo = $month->addMonth()->format('Y-m-d H:i:s.v');
-            if ($holds->contains(fn (array $h): bool => $h['from'] < $monthTo && $h['to'] >= $monthFrom)) {
+            // Rows restored for an older, already dropped month land in the
+            // oldest remaining partition, so check its real date range too.
+            if ($holds->isNotEmpty()) {
+                $range = DB::selectOne("SELECT MIN(occurred_at) AS lo, MAX(occurred_at) AS hi FROM audit_logs PARTITION ({$partition['name']})");
+                if ($range->lo !== null) {
+                    $monthFrom = min($monthFrom, CarbonImmutable::parse($range->lo)->format('Y-m-d H:i:s.v'));
+                    $monthTo = max($monthTo, CarbonImmutable::parse($range->hi)->format('Y-m-d H:i:s.v'));
+                }
+            }
+            if ($holds->contains(fn (array $h): bool => $h['from'] <= $monthTo && $h['to'] >= $monthFrom)) {
                 $result['skipped'][] = "{$partition['name']} (holds logs restored from the archive)";
 
                 continue;
@@ -69,9 +78,9 @@ class RetentionPruner
             }
 
             if (! $dryRun) {
-                $result['deleted_keys'] += $this->deleteKeys($archiver, null, $month->addMonth(), $batchSize);
                 DB::connection((string) config('audit.maintenance_connection', 'maintenance'))
                     ->statement("ALTER TABLE audit_logs DROP PARTITION {$partition['name']}");
+                $result['deleted_keys'] += $this->deleteKeys($archiver, null, $month->addMonth(), $batchSize, $now);
             }
             $result['dropped_partitions'][] = $partition['name'];
         }
@@ -107,7 +116,7 @@ class RetentionPruner
                 $result['deleted_rows'] += $deleted;
             } while ($deleted === $batchSize);
 
-            $result['deleted_keys'] += $this->deleteKeys($archiver, $project->id, $cutoff, $batchSize);
+            $result['deleted_keys'] += $this->deleteKeys($archiver, $project->id, $cutoff, $batchSize, $now);
         }
 
         if (! $dryRun && ($result['deleted_rows'] > 0 || $result['dropped_partitions'] !== [])) {
@@ -146,14 +155,25 @@ class RetentionPruner
             ->values();
     }
 
-    private function deleteKeys(ConnectionInterface $archiver, ?int $projectId, CarbonImmutable $before, int $batchSize): int
+    /**
+     * Idempotency keys go only once their log row is really gone: during the
+     * archive grace period, or for restored (held) ranges, the rows are still
+     * there and a client retry must still be answered "duplicate".
+     */
+    private function deleteKeys(ConnectionInterface $archiver, ?int $projectId, CarbonImmutable $before, int $batchSize, CarbonImmutable $now): int
     {
+        $sql = 'DELETE FROM ingestion_keys WHERE occurred_at < ? AND created_at < ?'
+            .($projectId ? ' AND project_id = ?' : '')
+            .' AND NOT EXISTS (SELECT 1 FROM audit_logs l WHERE l.uid = ingestion_keys.log_uid)'
+            .' LIMIT '.$batchSize;
+        $bindings = [$before->format('Y-m-d H:i:s.v'), $now->subHour()->format('Y-m-d H:i:s.v')];  // not a log still in the queue
+        if ($projectId) {
+            $bindings[] = $projectId;
+        }
+
         $total = 0;
         do {
-            $deleted = $archiver->delete(
-                'DELETE FROM ingestion_keys WHERE occurred_at < ?'.($projectId ? ' AND project_id = ?' : '').' LIMIT '.$batchSize,
-                $projectId ? [$before->format('Y-m-d H:i:s.v'), $projectId] : [$before->format('Y-m-d H:i:s.v')],
-            );
+            $deleted = $archiver->delete($sql, $bindings);
             $total += $deleted;
         } while ($deleted === $batchSize);
 

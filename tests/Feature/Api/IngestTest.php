@@ -6,6 +6,7 @@ use App\Models\IngestionBatch;
 use App\Models\IngestionKey;
 use App\Models\SecurityEvent;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -203,4 +204,15 @@ it('stores a job retry only once', function () {
     $job->handle();
 
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
+it('stores the log directly when the queue is down, so a retry is not a false duplicate', function () {
+    $payload = logPayload(['external_id' => 'order-queue-down']);
+    $this->mock(Dispatcher::class, function ($mock) {
+        $mock->shouldReceive('dispatch')->andThrow(new RuntimeException('redis down'));
+    });
+
+    $uid = sendApi($this, $this->issued, 'POST', '/api/v1/logs', $payload)->assertStatus(202)->json('data.uid');
+
+    expect(AuditLog::query()->withoutGlobalScopes()->where('uid', $uid)->exists())->toBeTrue();
 });

@@ -101,7 +101,7 @@ services:
 
   queue-worker:
     <<: *app
-    # Horizon supervises the ingest/default/maintenance workers (config/horizon.php).
+    # Horizon supervises the ingest and default workers (config/horizon.php).
     command: ["php", "artisan", "horizon"]
     stop_grace_period: 60s
     environment:
@@ -119,6 +119,9 @@ services:
   scheduler:
     <<: *app
     command: ["php", "artisan", "schedule:work"]
+    # Archive/prune can take minutes: let them finish instead of being killed
+    # (a killed task leaves its overlap lock behind).
+    stop_grace_period: 120s
     environment:
       CONTAINER_ROLE: scheduler
     depends_on:

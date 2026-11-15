@@ -40,6 +40,7 @@ class MembersRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         $roles = self::projectRoles();
+        $grantable = fn (): array => array_intersect_key($roles, array_flip($this->grantableRoleIds()));
 
         return $table
             ->recordTitleAttribute('name')
@@ -62,9 +63,10 @@ class MembersRelationManager extends RelationManager
                                 ->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
                                 ->limit(20)->pluck('email', 'id'))
                             ->getOptionLabelUsing(fn ($value) => User::query()->find($value)?->email),
-                        Select::make('role_id')->label('الدور')->required()->options($roles),
+                        Select::make('role_id')->label('الدور')->required()->options($grantable),
                     ])
                     ->action(function (array $data) {
+                        $this->ensureGrantable((int) $data['role_id']);
                         $this->project()->members()->attach($data['user_id'], [
                             'role_id' => $data['role_id'],
                             'added_by' => auth()->id(),
@@ -80,10 +82,12 @@ class MembersRelationManager extends RelationManager
                 Action::make('changeRole')
                     ->label('تغيير الدور')
                     ->icon(Heroicon::OutlinedPencilSquare)
-                    ->visible(fn () => $this->canManage())
+                    ->visible(fn (User $record) => $this->canManageMember($record))
                     ->fillForm(fn (User $record) => ['role_id' => $record->pivot->role_id])
-                    ->schema([Select::make('role_id')->label('الدور')->required()->options($roles)])
+                    ->schema([Select::make('role_id')->label('الدور')->required()->options($grantable)])
                     ->action(function (User $record, array $data) {
+                        abort_unless($this->canManageMember($record), 403);
+                        $this->ensureGrantable((int) $data['role_id']);
                         $old = $record->pivot->role_id;
                         $this->project()->members()->updateExistingPivot($record->id, ['role_id' => $data['role_id']]);
                         app(PlatformAuditLogger::class)->record('project.member_role_changed', $this->project(), [
@@ -97,8 +101,9 @@ class MembersRelationManager extends RelationManager
                     ->icon(Heroicon::OutlinedUserMinus)
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn () => $this->canManage())
+                    ->visible(fn (User $record) => $this->canManageMember($record))
                     ->action(function (User $record) {
+                        abort_unless($this->canManageMember($record), 403);
                         $this->project()->members()->detach($record->id);
                         app(PlatformAuditLogger::class)->record('project.member_removed', $this->project(), ['user_id' => $record->id]);
                     }),
@@ -111,6 +116,38 @@ class MembersRelationManager extends RelationManager
         return Role::query()->where('scope', 'project')->orderBy('name')->pluck('name', 'id')
             ->map(fn (string $name) => Labels::role($name))
             ->all();
+    }
+
+    /**
+     * Security review M2: a member manager can only hand out project roles
+     * whose permissions they hold on this project themselves.
+     *
+     * @return list<int>
+     */
+    public function grantableRoleIds(): array
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return [];
+        }
+        $projectId = (int) $this->project()->getKey();
+
+        return Role::query()->where('scope', 'project')->with('permissions')->get()
+            ->filter(fn (Role $role) => $role->permissions->every(fn ($p) => $actor->canInProject($p->name, $projectId)))
+            ->map(fn (Role $role) => (int) $role->id)->values()->all();
+    }
+
+    private function ensureGrantable(int $roleId): void
+    {
+        abort_unless(in_array($roleId, $this->grantableRoleIds(), true), 403);
+    }
+
+    /** Not one's own membership, and not a member holding a role the actor could not grant. */
+    private function canManageMember(User $record): bool
+    {
+        return $this->canManage()
+            && $record->getKey() !== auth()->id()
+            && in_array((int) $record->pivot->role_id, $this->grantableRoleIds(), true);
     }
 
     private function canManage(): bool

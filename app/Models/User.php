@@ -125,7 +125,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $this->hasAnyRole(config('audit.accounts.mfa_required_roles', []))
             || $this->roles->contains(fn ($role) => ($role->scope ?? 'platform') === 'platform')
-            || $this->canGlobally('logs.view_sensitive');
+            || $this->projectIdsWith('logs.view_sensitive') !== [];
     }
 
     /* ---------------------------------------------------------------

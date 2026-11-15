@@ -27,8 +27,20 @@ x-prod-app: &prod-app
     - ./.env:/etc/audit/.env:ro
 
 services:
+  # The web-facing container gets only what it needs (security review M5):
+  # no root, archiver or backup database passwords and no copy of .env.
+  # Retention, archiving and the app-files backup run in the scheduler and
+  # queue-worker, which keep them.
   app:
     <<: *prod-app
+    environment: !override
+      CONTAINER_ROLE: app
+      DB_ROOT_PASSWORD: ""
+      DB_ARCHIVER_PASSWORD: ""
+      DB_BACKUP_PASSWORD: ""
+    volumes: !override
+      - app-storage:/var/www/html/storage
+      - backup-spool:/var/www/html/storage/app/backup-spool
 
   queue-worker:
     <<: *prod-app

@@ -34,7 +34,7 @@ class BackupMonitorCommand extends Command
         }
 
         foreach ($status->problems() as $problem) {
-            $alerts->send('backup:stale:'.md5($problem), 'Backup is late', $problem, 'critical');
+            $alerts->send('backup:stale:'.md5((string) strtok($problem, ':')), 'Backup is late', $problem, 'critical');
         }
 
         $this->components->info("Imported {$imported} backup result(s).");

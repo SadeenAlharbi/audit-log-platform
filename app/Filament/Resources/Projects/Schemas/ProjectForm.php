@@ -56,7 +56,10 @@ class ProjectForm
                         ->numeric()
                         ->integer()
                         ->required()
-                        ->minValue(1)
+                        // Shortening retention deletes data, so only a
+                        // platform-level role may lower it (review L9).
+                        ->minValue(fn (?Project $record): int => $record !== null && ! (auth()->user()?->canGlobally('projects.update') ?? false)
+                            ? (int) $record->retention_days : 1)
                         ->maxValue($max)
                         ->default((int) config('audit.retention.default_days', 365)),
 

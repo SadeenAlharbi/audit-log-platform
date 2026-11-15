@@ -34,7 +34,9 @@ class AppFilesBackup
         try {
             $archive = $tmp.'.tar.gz';
             $command = ['tar', '-czf', $archive,
-                '--exclude=app/backup-spool', '--exclude=app/tmp', '--exclude=app/archive-cache',
+                // app/backups is the local backups disk in development: without this
+                // every backup would contain all earlier ones.
+                '--exclude=app/backup-spool', '--exclude=app/tmp', '--exclude=app/backups',
                 '-C', base_path(), 'storage/app'];
 
             // The configuration file lives at base_path('.env') in development;

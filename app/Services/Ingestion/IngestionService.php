@@ -6,8 +6,10 @@ use App\Jobs\StoreAuditLogs;
 use App\Models\IngestionBatch;
 use App\Models\ProjectApiKey;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Accepts validated logs (plan §6, decisions D2 + D4):
@@ -139,10 +141,25 @@ class IngestionService
     }
 
     /**
+     * The idempotency key is already reserved (and ingestion_keys is
+     * append-only), so if the queue push fails (Redis down) the logs are
+     * stored synchronously instead: otherwise the client's retry would be
+     * answered "duplicate" for a log that was never stored. Only if that
+     * fails too does the client get a 5xx.
+     *
      * @param  list<array<string, scalar|null>>  $rows
      */
     private function dispatch(array $rows, ?int $batchId): void
     {
-        StoreAuditLogs::dispatch($rows, $batchId)->onQueue((string) config('audit.api.queue', 'ingest'));
+        $job = (new StoreAuditLogs($rows, $batchId))->onQueue((string) config('audit.api.queue', 'ingest'));
+
+        try {
+            // Explicit dispatch (PendingDispatch only pushes in its
+            // destructor) so a failure is caught right here.
+            app(Dispatcher::class)->dispatch($job);
+        } catch (Throwable $e) {
+            report($e);
+            app()->call([$job, 'handle']);
+        }
     }
 }

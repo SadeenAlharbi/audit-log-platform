@@ -7,6 +7,7 @@ use App\Services\Alerts\AlertNotifier;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 #[Signature('api-keys:expiring')]
 #[Description('Warn about API keys that expire soon (mandatory 90-day rotation)')]
@@ -21,6 +22,10 @@ class ApiKeysExpiringCommand extends Command
             ->with('project:id,name,slug')
             ->whereNull('revoked_at')
             ->whereBetween('expires_at', [now(), now()->addDays($days)])
+            // A rotated key is already replaced; it is only in its grace period.
+            ->whereNotExists(fn ($q) => $q->from('platform_audit')->where('action', 'api_key.rotated')
+                ->where('target_type', (new ProjectApiKey)->getMorphClass())
+                ->whereColumn('target_id', DB::raw('CAST(project_api_keys.id AS CHAR)')))
             ->orderBy('expires_at')
             ->get();
 

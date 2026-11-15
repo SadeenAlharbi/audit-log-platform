@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Alerts\AlertNotifier;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -12,7 +13,9 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 // Keep the next months of audit_logs partitions ready (idempotent).
-Schedule::command('audit:partitions')->dailyAt('01:10')->onOneServer()->withoutOverlapping();
+// A failure here means next month's logs have nowhere to go: alert.
+Schedule::command('audit:partitions')->dailyAt('01:10')->onOneServer()->withoutOverlapping()
+    ->onFailure(fn () => app(AlertNotifier::class)->send('partitions:failed', 'Partition maintenance failed', 'php artisan audit:partitions failed; check the scheduler logs.', 'critical'));
 
 // Write-ahead archive: every stored log goes to S3/MinIO as JSONL.gz.
 Schedule::command('audit:archive')->hourlyAt(5)->onOneServer()->withoutOverlapping(120);

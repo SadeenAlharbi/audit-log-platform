@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\StoreAuditLogs;
 use Illuminate\Support\Str;
 
 return [
@@ -133,7 +134,9 @@ return [
     */
 
     'silenced' => [
-        // App\Jobs\ExampleJob::class,
+        // Ingest jobs carry up to 1 MB of logs each; keeping completed ones
+        // in Redis for an hour only costs memory.
+        StoreAuditLogs::class,
     ],
 
     'silenced_tags' => [

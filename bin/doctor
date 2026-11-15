@@ -29,8 +29,10 @@ step() {
 } | tee -a "$LOG"
 
 if [ ! -f .env ]; then
-    cp .env.docker.example .env
-    echo "created .env from .env.docker.example" | tee -a "$LOG"
+    # bin/setup generates the passwords and the backup key; a copied example
+    # would start MariaDB with the "change-me" placeholders.
+    echo "no .env yet: run bin/setup (or make setup) first" | tee -a "$LOG"
+    exit 1
 fi
 
 if [ ! -f vendor/autoload.php ]; then

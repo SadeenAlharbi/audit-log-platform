@@ -60,7 +60,7 @@ class DemoSeeder extends Seeder
 
     public function run(): void
     {
-        if (app()->environment('production')) {
+        if (! app()->environment(['local', 'testing', 'review'])) {
             throw new RuntimeException('DemoSeeder is for development and review environments only.');
         }
 

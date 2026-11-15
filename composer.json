@@ -47,9 +47,7 @@
     },
     "scripts": {
         "setup": [
-            "@php -r \"file_exists('.env') || copy('.env.docker.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --seed --force"
+            "bin/setup"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",

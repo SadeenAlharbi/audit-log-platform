@@ -66,9 +66,15 @@ class AuthenticateApiKey
         $request->attributes->set('api_key', $key);
         $request->attributes->set('project', $project);
 
-        $this->touch($key, (string) $request->ip());
+        $response = $next($request);
 
-        return $next($request);
+        // "Last used" (and the project's "last received") counts only
+        // requests that passed every check: signature, scope, validation.
+        if ($response->getStatusCode() < 400) {
+            $this->touch($key, (string) $request->ip());
+        }
+
+        return $response;
     }
 
     private function reject(Request $request, string $reason, ?ProjectApiKey $key = null, int $status = 401): Response

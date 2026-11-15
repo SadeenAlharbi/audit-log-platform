@@ -36,6 +36,9 @@ MARIADBD_EXTRA_ARGS="${MARIADBD_EXTRA_ARGS:-}"
 
 mkdir -p "$BACKUP_ROOT/full" "$BACKUP_ROOT/incremental" "$BACKUP_ROOT/binlogs" "$BACKUP_ROOT/artifacts" \
          "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports"
+# The app containers run as www-data (uid 33) and write requests and the
+# "processed" markers into the spool: hand them the folders.
+chown -R 33:33 "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports" 2>/dev/null || chmod 1777 "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports"
 
 log() { echo "[backup $(date -u +%FT%TZ)] $*" >&2; }
 now_iso() { date -u +%FT%TZ; }
@@ -163,6 +166,9 @@ run_binlogs() {
         [ -e "$f" ] || continue
         local name; name="$(basename "$f")"
         [ "$name" = "$current" ] && continue
+        # The shipped list outlives the local copies (cleanup removes those
+        # after LOCAL_KEEP_DAYS while the server may keep the file longer).
+        grep -qxF "$name" "$BACKUP_ROOT/binlogs/.shipped" 2>/dev/null && continue
         [ -e "$BACKUP_ROOT/binlogs/$name" ] && continue
         cp -p "$f" "$BACKUP_ROOT/binlogs/$name" || { failed=$((failed + 1)); continue; }
         local shipped size
@@ -172,6 +178,7 @@ run_binlogs() {
             failed=$((failed + 1))
             continue
         fi
+        echo "$name" >> "$BACKUP_ROOT/binlogs/.shipped"
         size="$(awk '{print $1}' <<< "$shipped")"
         total=$((total + size)); copied=$((copied + 1))
     done
@@ -206,7 +213,7 @@ run_restore_test() {
 
     local work; work="$(mktemp -d /tmp/restore-test.XXXXXX)"
     local sock="$work/mysqld.sock" report="$SPOOL/reports/restore-test-$(stamp).md"
-    trap 'mariadb-admin --socket="'"$work"'/mysqld.sock" -uroot shutdown >/dev/null 2>&1 || true; rm -rf "'"$work"'"' RETURN
+    trap 'mariadb-admin --socket="'"$work"'/mysqld.sock" -uroot shutdown >/dev/null 2>&1 || true; rm -rf "'"$work"'"; trap - RETURN' RETURN
 
     local chain=("$full")
     while read -r inc; do chain+=("$inc"); done < <(ls -1d "$BACKUP_ROOT"/incremental/* 2>/dev/null | sort | awk -v f="$(basename "$full")" -F/ '$NF > f')
@@ -256,12 +263,20 @@ run_restore_test() {
     max_id="$("${q[@]}" -e 'SELECT COALESCE(MAX(id),0) FROM audit_logs' 2>>"$work/query.err" || echo -1)"
     partitions="$("${q[@]}" -e "SELECT COUNT(*) FROM information_schema.PARTITIONS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='audit_logs'" 2>>"$work/query.err" || echo -1)"
     expected="$(jq -r '.max_audit_id' "${chain[-1]}/audit-meta.json")"
+    # Row count (D13): every row up to the recorded max id that still exists
+    # in the live database must be in the restore. Retention may have deleted
+    # rows since, which only lowers the live count.
+    restored_upto="$("${q[@]}" -e "SELECT COUNT(*) FROM audit_logs WHERE id <= $expected" 2>>"$work/query.err" || echo -1)"
+    live_upto="$(mariadb "${conn[@]}" -N -e "SELECT COUNT(*) FROM \`$DB_NAME\`.audit_logs WHERE id <= $expected" 2>/dev/null || echo -1)"
     local seconds=$(( $(date +%s) - t0 ))
 
     local status=succeeded error=""
     [ -n "$failed_checks" ] && { status=failed; error="CHECK TABLE failed:$failed_checks"; }
     [ "$rows" -lt 0 ] && { status=failed; error="${error:+$error; }audit_logs unreadable: $(head -c 300 "$work/query.err")"; }
     [ "$max_id" -lt "$expected" ] && { status=failed; error="${error:+$error; }restored max(id) $max_id < $expected recorded at backup time"; }
+    if [ "$live_upto" -ge 0 ] && [ "$restored_upto" -lt "$live_upto" ]; then
+        status=failed; error="${error:+$error; }restored $restored_upto rows with id <= $expected, live database has $live_upto"
+    fi
 
     cat > "$report" <<MD
 # Restore test report
@@ -275,13 +290,14 @@ run_restore_test() {
 | Tables checked (CHECK TABLE) | $(wc -w <<< "$tables") — failures: ${failed_checks:-none} |
 | audit_logs rows | $rows |
 | audit_logs max(id) | $max_id (expected ≥ $expected) |
+| Rows with id ≤ $expected | restored $restored_upto, live $live_upto (restored must be ≥ live) |
 | audit_logs partitions | $partitions |
 
 ${error:+**Error:** $error}
 MD
 
     write_status restore_test "$status" "$started" "" "local:$report" "" "$error" \
-        "{\"rows\":$rows,\"max_id\":$max_id,\"expected_min_id\":$expected,\"tables\":$(wc -w <<< "$tables"),\"chain\":${#chain[@]},\"seconds\":$seconds}"
+        "{\"rows\":$rows,\"rows_upto\":$restored_upto,\"live_rows_upto\":$live_upto,\"max_id\":$max_id,\"expected_min_id\":$expected,\"tables\":$(wc -w <<< "$tables"),\"chain\":${#chain[@]},\"seconds\":$seconds}"
     log "restore test $status in ${seconds}s (rows=$rows)"
     [ "$status" = succeeded ]
 }
@@ -305,15 +321,21 @@ process_requests() {
 
 do_schedule() {
     log "scheduler started (full daily at ${FULL_BACKUP_HOUR}:00 UTC, incremental + binlogs hourly, restore test weekly)"
-    local last_hour=""
+    # Slots run on the first loop after the hour changes, so a long full
+    # backup delays the next slot instead of skipping it. The weekly restore
+    # test catches up later that day if its hour was taken by a long backup.
+    local last_hour; last_hour="$(date -u +%Y%m%d%H)"
+    local last_restore_week=""
     while true; do
         process_requests
         local hour; hour="$(date -u +%Y%m%d%H)"
-        if [ "$(date -u +%M)" = "00" ] && [ "$hour" != "$last_hour" ]; then
+        if [ "$hour" != "$last_hour" ]; then
             last_hour="$hour"
             if [ "$(date -u +%-H)" -eq "$FULL_BACKUP_HOUR" ]; then run_backup full || true; else run_backup incremental || true; fi
             run_binlogs || true
-            if [ "$(date -u +%u)" -eq "$RESTORE_TEST_WEEKDAY" ] && [ "$(date -u +%-H)" -eq "$RESTORE_TEST_HOUR" ]; then
+            local week; week="$(date -u +%G%V)"
+            if [ "$(date -u +%u)" -eq "$RESTORE_TEST_WEEKDAY" ] && [ "$(date -u +%-H)" -ge "$RESTORE_TEST_HOUR" ] && [ "$week" != "$last_restore_week" ]; then
+                last_restore_week="$week"
                 run_restore_test || true
             fi
         fi

@@ -42,7 +42,9 @@ class PlatformStats extends StatsOverviewWidget
                 'rejected' => $user->canGlobally('security_events.view')
                     ? SecurityEvent::query()->where('created_at', '>=', now()->subDay())->count()
                     : null,
-                'failed_batches' => IngestionBatch::query()->where('created_at', '>=', now()->subDay())->where('status', 'failed')->count(),
+                'failed_batches' => IngestionBatch::query()
+                    ->when($user->projectIdsWith('logs.view') !== null, fn ($q) => $q->whereIn('project_id', $user->projectIdsWith('logs.view')))
+                    ->where('created_at', '>=', now()->subDay())->where('status', 'failed')->count(),
             ];
         });
 

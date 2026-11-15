@@ -1,5 +1,7 @@
 <?php
 
+use App\Filament\Resources\Projects\RelationManagers\MembersRelationManager;
+use App\Filament\Resources\Users\Pages\SyncPlatformRoles;
 use App\Models\AuditLog;
 use App\Models\BackupRun;
 use App\Models\Project;
@@ -143,10 +145,48 @@ it('does not let a user manager take over a more privileged account', function (
         ->and($manager->can('update', Role::findByName('project_viewer')))->toBeTrue();
 });
 
+it('does not let a user manager grant a role more powerful than their own', function () {
+    $manager = platformUser('platform_auditor');
+    $managerRole = Role::findOrCreate('user_manager', 'web');
+    $managerRole->syncPermissions(['users.manage', 'roles.manage']);
+    $manager->assignRole($managerRole);
+    $this->actingAs($manager);
+
+    $new = User::factory()->create();
+    SyncPlatformRoles::sync($new, ['super_admin', 'platform_auditor']);
+    expect($new->fresh()->getRoleNames()->all())->toBe(['platform_auditor']);
+
+    // A role the manager cannot grant is not removed either.
+    $admin = User::factory()->create();
+    $admin->assignRole('security_officer');
+    $this->actingAs(platformUser('super_admin'));
+    $this->actingAs($manager);
+    SyncPlatformRoles::sync($admin, []);
+    expect($admin->fresh()->hasRole('security_officer'))->toBeTrue();
+});
+
 it('requires 2FA for every platform-wide role, not for project members', function () {
     expect(platformUser('super_admin')->requiresMultiFactorAuthentication())->toBeTrue()
         ->and(platformUser('security_officer')->requiresMultiFactorAuthentication())->toBeTrue()
         ->and(platformUser('platform_auditor')->requiresMultiFactorAuthentication())->toBeTrue()
         ->and(projectUser($this->a, 'project_owner')->requiresMultiFactorAuthentication())->toBeFalse()
         ->and(projectUser($this->a, 'project_viewer')->requiresMultiFactorAuthentication())->toBeFalse();
+});
+
+it('lets a project member manager grant only project roles within their own permissions', function () {
+    seedRoles();
+    $project = Project::factory()->create();
+    $limited = Role::query()->firstOrCreate(['name' => 'project_member_admin', 'guard_name' => 'web'], ['scope' => 'project']);
+    $limited->forceFill(['scope' => 'project'])->save();
+    $limited->syncPermissions(['projects.view', 'logs.view']);
+    $manager = User::factory()->create();
+    $project->members()->attach($manager->id, ['role_id' => $limited->id]);
+    $this->actingAs($manager->fresh());
+
+    $rm = new MembersRelationManager;
+    $rm->ownerRecord = $project;
+    $grantable = $rm->grantableRoleIds();
+
+    expect($grantable)->toContain($limited->id)
+        ->and($grantable)->not->toContain(Role::findByName('project_owner')->id);
 });

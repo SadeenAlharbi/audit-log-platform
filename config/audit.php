@@ -193,7 +193,7 @@ return [
     'archive' => [
         'disk' => env('AUDIT_ARCHIVE_DISK', 'archive'),
         // Rows newer than this are not archived yet (lets in-flight inserts commit).
-        'settle_seconds' => 120,
+        'settle_seconds' => (int) env('AUDIT_ARCHIVE_SETTLE_SECONDS', 600), // well above the ingest job timeout (120s)
         'chunk_size' => 5000,
         // Plan §9 "soft archive": rows are deleted only once their archive
         // run is at least this many days old (they stay queryable meanwhile).

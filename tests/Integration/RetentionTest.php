@@ -38,13 +38,30 @@ it('never deletes rows that are not archived yet', function () {
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
 });
 
+it('keeps idempotency keys while their log rows still exist', function () {
+    $project = Project::factory()->create(['retention_days' => 7]);
+    $old = now()->utc()->subDays(20);
+    $log = makeAuditLog($project, ['occurred_at' => $old, 'external_id' => 'kept']);
+    DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'kept', 'log_uid' => $log->uid, 'occurred_at' => $old->format('Y-m-d H:i:s.v'), 'created_at' => $old->format('Y-m-d H:i:s.v')]);
+
+    // Not archived yet: the row stays, and so must its key.
+    $this->artisan('audit:prune --skip-archive')->assertSuccessful();
+
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1)
+        ->and(DB::table('ingestion_keys')->where('external_id', 'kept')->exists())->toBeTrue();
+});
+
 it('drops monthly partitions older than the platform maximum', function () {
     // Pretend the platform keeps 1 day: last month's partition is expired.
+    // On the 1st of a month last month is still within 1 day: move forward.
+    if (CarbonImmutable::now('UTC')->day === 1) {
+        $this->travelTo(CarbonImmutable::now('UTC')->addDay());
+    }
     config(['audit.retention.max_days' => 1]);
     $project = Project::factory()->create(['retention_days' => 1]);
     $lastMonth = CarbonImmutable::now('UTC')->startOfMonth()->subMonth()->addDays(2);
     makeAuditLog($project, ['occurred_at' => $lastMonth, 'external_id' => 'k1']);
-    DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'k1', 'log_uid' => 'x', 'occurred_at' => $lastMonth->format('Y-m-d H:i:s.v'), 'created_at' => now()]);
+    DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'k1', 'log_uid' => 'x', 'occurred_at' => $lastMonth->format('Y-m-d H:i:s.v'), 'created_at' => $lastMonth->format('Y-m-d H:i:s.v')]);
 
     $this->artisan('audit:prune')->assertSuccessful();
 

@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Projects\Actions;
 
 use App\Models\Project;
+use App\Models\User;
 use App\Services\Ingestion\TestLogSender;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
 /**
@@ -20,12 +22,27 @@ class SendTestLogAction
             ->label('إرسال سجل تجريبي')
             ->icon(Heroicon::OutlinedPaperAirplane)
             ->color('gray')
-            ->visible(fn (Project $record) => $record->archived_at === null && (auth()->user()?->can('update', $record) ?? false))
+            // It issues a (temporary) write key, so it needs the key permission too.
+            ->visible(function (Project $record): bool {
+                $user = auth()->user();
+
+                return $record->archived_at === null && $user instanceof User
+                    && $user->can('update', $record) && $user->canInProject('api_keys.create', $record);
+            })
             ->action(function (Project $record) {
+                $limiter = 'test-log:'.auth()->id();
+                if (RateLimiter::tooManyAttempts($limiter, 5)) {
+                    Notification::make()->title('محاولات كثيرة')->body('أعد المحاولة بعد دقيقة.')->warning()->send();
+
+                    return;
+                }
+                RateLimiter::hit($limiter, 60);
+
                 try {
                     $result = app(TestLogSender::class)->send($record, auth()->user());
                 } catch (Throwable $e) {
-                    Notification::make()->title('فشل الإرسال')->body($e->getMessage())->danger()->send();
+                    report($e);
+                    Notification::make()->title('فشل الإرسال')->body('حدث خطأ داخلي. التفاصيل في سجل التطبيق.')->danger()->send();
 
                     return;
                 }

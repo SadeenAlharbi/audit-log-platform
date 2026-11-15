@@ -108,6 +108,7 @@ class TestLogSender
         // and the key resolver read it from the container), then put the
         // dashboard's own request back.
         $original = app('request');
+        $originalRoute = $this->router->current();
         app()->instance('request', $request);
         Facade::clearResolvedInstance('request');
         // An external system has no dashboard session: without this, the
@@ -126,6 +127,8 @@ class TestLogSender
         } finally {
             app()->instance('request', $original);
             Facade::clearResolvedInstance('request');
+            // Router::dispatch replaced the current route; put the dashboard's back.
+            (fn () => [$this->current = $originalRoute, $this->currentRequest = $original])->call($this->router);
             if ($dashboardUser !== null) {
                 $guard->setUser($dashboardUser);
             }

@@ -35,6 +35,7 @@ cp .env.docker.example .env
 | المتغير | القيمة في الإنتاج |
 |---|---|
 | `APP_ENV` / `APP_DEBUG` | `production` / `false` |
+| `AUDIT_API_REQUIRE_HTTPS` | `true`، أو اتركه غير معرّف (الإنتاج يفرض HTTPS افتراضيًا) |
 | `APP_URL` | `https://audit.example.com` |
 | `APP_KEY` | `docker run --rm audit-log-platform/app php artisan key:generate --show` بعد البناء |
 | `TRUSTED_PROXIES` | عناوين الـ proxy **بالتحديد**. لا تستخدم `*` إلا إذا كان التطبيق لا يُوصَل إليه إلا عبر الـ proxy، لأن قوائم IP للمفاتيح تعتمد على `X-Forwarded-For` |

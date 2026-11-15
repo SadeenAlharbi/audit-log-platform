@@ -21,7 +21,8 @@ class AuditLogInfolist
             Grid::make(3)->columnSpanFull()->schema([
                 Section::make('الحدث')->columnSpan(2)->columns(3)->schema([
                     TextEntry::make('event')->label('الحدث')->fontFamily('mono')->weight('bold'),
-                    TextEntry::make('action')->label('العملية')->badge(),
+                    TextEntry::make('action')->label('العملية')->badge()
+                        ->formatStateUsing(fn (string $state) => AuditLogsTable::ACTION_LABELS[$state] ?? $state),
                     TextEntry::make('severity')->label('الخطورة')->badge()
                         ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
                         ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
@@ -44,7 +45,7 @@ class AuditLogInfolist
                     TextEntry::make('actor_id')->label('المعرّف')->placeholder('—'),
                     TextEntry::make('actor_name')->label('الاسم')->placeholder('—'),
                     TextEntry::make('actor_ip')->label('IP')->placeholder('—'),
-                    TextEntry::make('user_agent')->label('User agent')->placeholder('—')->columnSpanFull(),
+                    TextEntry::make('user_agent')->label('المتصفح أو الجهاز (User agent)')->placeholder('—')->columnSpanFull(),
                 ]),
                 Section::make('الكيان المتأثر')->columns(2)->schema([
                     TextEntry::make('subject_type')->label('النوع')->placeholder('—'),

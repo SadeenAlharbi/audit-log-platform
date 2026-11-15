@@ -17,6 +17,18 @@ use Illuminate\Support\Carbon;
 
 class AuditLogsTable
 {
+    /**
+     * Arabic names of the common actions; any other value is shown as sent
+     * (`action` is free-form in the API).
+     *
+     * @var array<string, string>
+     */
+    public const ACTION_LABELS = [
+        'create' => 'إنشاء', 'update' => 'تعديل', 'delete' => 'حذف', 'restore' => 'استرجاع',
+        'view' => 'عرض', 'export' => 'تصدير', 'import' => 'استيراد', 'login' => 'دخول',
+        'logout' => 'خروج', 'approve' => 'اعتماد', 'reject' => 'رفض', 'custom' => 'مخصص',
+    ];
+
     /** @var array<string, string> */
     public const SEVERITY_LABELS = ['info' => 'معلومة', 'warning' => 'تحذير', 'critical' => 'حرج'];
 
@@ -36,7 +48,8 @@ class AuditLogsTable
                 TextColumn::make('occurred_at')->label('الوقت')->dateTime('Y-m-d H:i:s')->sortable(),
                 TextColumn::make('project.name')->label('المشروع')->toggleable(),
                 TextColumn::make('event')->label('الحدث')->searchable()->fontFamily('mono')->weight('medium'),
-                TextColumn::make('action')->label('العملية')->badge()->color('gray'),
+                TextColumn::make('action')->label('العملية')->badge()->color('gray')
+                    ->formatStateUsing(fn (string $state) => self::ACTION_LABELS[$state] ?? $state),
                 TextColumn::make('severity')->label('الخطورة')->badge()
                     ->formatStateUsing(fn (string $state) => self::SEVERITY_LABELS[$state] ?? $state)
                     ->color(fn (string $state) => self::SEVERITY_COLORS[$state] ?? 'gray'),

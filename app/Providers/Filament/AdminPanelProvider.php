@@ -53,12 +53,15 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): View => view('filament.partials.platforms-code-styles'))
             ->renderHook(PanelsRenderHook::FOOTER, fn (): View => view('filament.partials.footer'))
             ->maxContentWidth(Width::Full)
-            ->sidebarCollapsibleOnDesktop()
+            // A fixed, slim sidebar (it never collapses to icons) and no
+            // global search box: each list page has its own search and filters.
+            ->sidebarWidth('15rem')
+            ->globalSearch(false)
             ->navigationGroups([
-                NavigationGroup::make('السجلات'),
-                NavigationGroup::make('الأمان'),
-                NavigationGroup::make('الإدارة'),
-                NavigationGroup::make('التشغيل'),
+                NavigationGroup::make('السجلات')->collapsible(false),
+                NavigationGroup::make('الأمان')->collapsible(false),
+                NavigationGroup::make('الإدارة')->collapsible(false),
+                NavigationGroup::make('التشغيل')->collapsible(false),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

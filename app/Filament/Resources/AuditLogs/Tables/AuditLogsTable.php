@@ -7,6 +7,7 @@ use App\Models\Project;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
@@ -122,8 +123,10 @@ class AuditLogsTable
                             $query->whereJsonContains('tags', (string) $data['tag']);
                         }
                     }),
-            ], layout: FiltersLayout::AboveContentCollapsible)
-            ->filtersFormColumns(4)
+            ], layout: FiltersLayout::Dropdown)
+            // The filter button sits beside the search box; the panel opens wide.
+            ->filtersFormColumns(2)
+            ->filtersFormWidth(Width::ThreeExtraLarge)
             ->recordActions([
                 ViewAction::make(),
             ])

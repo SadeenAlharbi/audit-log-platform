@@ -85,7 +85,8 @@ it('includes the configuration file from BACKUP_ENV_FILE (production mount)', fu
     $dir = storage_path('app/tmp/env-test-'.uniqid());
     mkdir($dir, 0700, true);
     file_put_contents($dir.'/.env', "APP_NAME=Test\n");
-    config(['audit.backup.env_file' => $dir.'/.env']);
+    // Unencrypted here so the archive can be listed (encryption has its own test).
+    config(['audit.backup.env_file' => $dir.'/.env', 'audit.backup.age_recipient' => null]);
 
     $this->artisan('backup:run --type=app')->assertSuccessful();
 

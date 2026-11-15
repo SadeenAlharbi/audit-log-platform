@@ -14,9 +14,9 @@ use Spatie\Permission\Models\Role;
 class UserForm
 {
     public const PLATFORM_ROLE_LABELS = [
-        'super_admin' => 'Super Admin — كل شيء',
-        'platform_auditor' => 'Platform Auditor — قراءة كل السجلات',
-        'security_officer' => 'Security Officer — المحاولات المرفوضة وقوائم IP',
+        'super_admin' => 'مدير المنصة: كل الصلاحيات',
+        'platform_auditor' => 'مدقق المنصة: قراءة سجلات كل المشاريع وتصديرها',
+        'security_officer' => 'مسؤول الأمن: المحاولات المرفوضة وتقييد عناوين IP',
     ];
 
     public static function configure(Schema $schema): Schema
@@ -35,7 +35,7 @@ class UserForm
                     ->helperText('المستخدم المعطّل لا يستطيع الدخول. المستخدمون لا يُحذفون.'),
             ]),
             Section::make('أدوار المنصة')
-                ->description('أدوار المشاريع (Owner / Viewer) تُدار من صفحة كل مشروع.')
+                ->description('أدوار المشاريع (مالك أو مشاهد) تُدار من صفحة كل مشروع.')
                 ->visible(fn (?User $record) => auth()->user()?->canGlobally('roles.manage') && ! auth()->user()->is($record))
                 ->schema([
                     CheckboxList::make('platform_roles')

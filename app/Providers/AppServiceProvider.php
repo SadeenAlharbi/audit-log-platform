@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Observers\PlatformAuditObserver;
 use App\Policies\RolePolicy;
 use App\Services\Security\SecurityEventRecorder;
+use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -44,6 +46,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // One digit style across the dashboard (Latin digits, as most Saudi
+        // government platforms use): Filament formats numbers with the app
+        // locale (ar) unless told otherwise, which mixed ٣٦٥ and 365.
+        Table::configureUsing(fn (Table $table) => $table->defaultNumberLocale('en'));
+        Schema::configureUsing(fn (Schema $schema) => $schema->defaultNumberLocale('en'));
+
         Gate::policy(Role::class, RolePolicy::class);
 
         // Security review M2/L3: in production every generated URL (reset

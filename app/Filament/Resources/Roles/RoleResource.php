@@ -7,11 +7,13 @@ use App\Filament\Resources\Roles\Pages\EditRole;
 use App\Filament\Resources\Roles\Pages\ListRoles;
 use App\Filament\Resources\Roles\Schemas\RoleForm;
 use App\Filament\Resources\Roles\Tables\RolesTable;
+use App\Filament\Support\Labels;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Spatie\Permission\Models\Role;
 use UnitEnum;
 
@@ -30,6 +32,11 @@ class RoleResource extends Resource
     protected static ?string $pluralModelLabel = 'الأدوار والصلاحيات';
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getRecordTitle(?Model $record): string
+    {
+        return Labels::role($record?->getAttribute('name'));
+    }
 
     public static function form(Schema $schema): Schema
     {

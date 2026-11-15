@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Filament\Support\Labels;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use Filament\Actions\Action;
@@ -24,9 +25,10 @@ class UsersTable
             ->columns([
                 TextColumn::make('name')->label('الاسم')->searchable()->sortable(),
                 TextColumn::make('email')->label('البريد')->searchable(),
-                TextColumn::make('roles.name')->label('أدوار المنصة')->badge()->placeholder('—'),
+                TextColumn::make('roles.name')->label('أدوار المنصة')->badge()->placeholder('—')
+                    ->formatStateUsing(fn (string $state) => Labels::role($state)),
                 IconColumn::make('is_active')->label('نشط')->boolean(),
-                IconColumn::make('mfa')->label('2FA')->boolean()
+                IconColumn::make('mfa')->label('المصادقة الثنائية')->boolean()
                     ->state(fn (User $record) => filled($record->app_authentication_secret)),
                 TextColumn::make('locked_until')->label('مقفل حتى')->dateTime()->placeholder('—')->color('danger'),
                 TextColumn::make('last_login_at')->label('آخر دخول')->since()->placeholder('لم يدخل'),

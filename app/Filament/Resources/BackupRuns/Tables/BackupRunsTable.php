@@ -15,7 +15,7 @@ class BackupRunsTable
     public const STATUS_LABELS = ['succeeded' => 'نجحت', 'failed' => 'فشلت', 'running' => 'قيد التنفيذ'];
 
     public const TYPE_LABELS = [
-        'full' => 'كاملة', 'incremental' => 'تزايدية', 'binlog' => 'Binary logs',
+        'full' => 'كاملة', 'incremental' => 'تزايدية', 'binlog' => 'سجلات القاعدة (binlog)',
         'logs_archive' => 'أرشيف السجلات', 'app_files' => 'ملفات التطبيق',
         'restore_test' => 'اختبار استعادة', 'restore' => 'استعادة',
     ];
@@ -41,9 +41,9 @@ class BackupRunsTable
                     ->placeholder('—'),
                 TextColumn::make('size')->label('الحجم')
                     ->formatStateUsing(fn ($state) => $state ? Number::fileSize((int) $state) : '—'),
-                TextColumn::make('location')->label('الموقع')->fontFamily('mono')->limit(50)->tooltip(fn ($state) => $state)->toggleable(),
+                TextColumn::make('location')->label('الموقع')->fontFamily('mono')->limit(32)->tooltip(fn ($state) => $state)->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('triggeredBy.name')->label('بواسطة')->placeholder('مجدول'),
-                TextColumn::make('error')->label('الخطأ')->color('danger')->limit(60)->placeholder('—')->toggleable(),
+                TextColumn::make('error')->label('الخطأ')->color('danger')->limit(40)->tooltip(fn ($state) => $state)->placeholder('—'),
             ])
             ->filters([
                 SelectFilter::make('type')->label('النوع')->options(self::TYPE_LABELS),

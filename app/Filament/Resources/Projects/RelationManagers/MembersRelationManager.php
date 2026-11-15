@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Projects\RelationManagers;
 
+use App\Filament\Support\Labels;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
@@ -107,10 +108,8 @@ class MembersRelationManager extends RelationManager
     /** @return array<int, string> role id => label */
     public static function projectRoles(): array
     {
-        $labels = ['project_owner' => 'Project Owner', 'project_viewer' => 'Project Viewer'];
-
         return Role::query()->where('scope', 'project')->orderBy('name')->pluck('name', 'id')
-            ->map(fn (string $name) => $labels[$name] ?? $name)
+            ->map(fn (string $name) => Labels::role($name))
             ->all();
     }
 

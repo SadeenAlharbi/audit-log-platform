@@ -8,6 +8,7 @@ use App\Models\ProjectApiKey;
 use App\Models\User;
 use App\Services\ApiKeys\ApiKeyManager;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
@@ -58,15 +59,18 @@ class ApiKeysRelationManager extends RelationManager
                 TextColumn::make('name')->label('الاسم')->searchable(),
                 TextColumn::make('key_prefix')->label('البادئة')->fontFamily('mono')->suffix('…'),
                 TextColumn::make('environment')->label('البيئة')->badge()
-                    ->color(fn (string $state) => $state === 'production' ? 'success' : 'gray'),
-                TextColumn::make('scopes')->label('الصلاحيات')->badge(),
+                    ->formatStateUsing(fn (string $state) => ['production' => 'إنتاج', 'staging' => 'تجريبي', 'development' => 'تطوير'][$state] ?? $state)
+                    ->color(fn (string $state) => $state === 'production' ? 'success' : 'gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('scopes')->label('الصلاحية')->badge()
+                    ->formatStateUsing(fn (string $state) => [ProjectApiKey::SCOPE_WRITE => 'إرسال', ProjectApiKey::SCOPE_READ => 'قراءة'][$state] ?? $state),
                 IconColumn::make('signed')->label('موقّع')->boolean()
                     ->state(fn (ProjectApiKey $record) => $record->hmac_secret !== null),
                 TextColumn::make('status')->label('الحالة')->badge()
                     ->state(fn (ProjectApiKey $record) => $record->status())
                     ->formatStateUsing(fn (string $state) => ['active' => 'نشط', 'expired' => 'منتهي', 'revoked' => 'ملغى'][$state])
                     ->color(fn (string $state) => ['active' => 'success', 'expired' => 'warning', 'revoked' => 'danger'][$state]),
-                TextColumn::make('allowed_ips')->label('IPs المسموحة')->badge()->placeholder('الكل')->toggleable(),
+                TextColumn::make('allowed_ips')->label('عناوين IP المسموحة')->badge()->placeholder('الكل')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('last_used_at')->label('آخر استخدام')->since()->placeholder('لم يُستخدم'),
                 TextColumn::make('expires_at')->label('ينتهي')->date()->placeholder('—')
                     ->color(fn (ProjectApiKey $record) => $record->expires_at?->lessThan(now()->addDays(14)) ? 'warning' : null),
@@ -86,9 +90,12 @@ class ApiKeysRelationManager extends RelationManager
                 $this->createKeyAction(),
             ])
             ->recordActions([
-                $this->rotateAction(),
-                $this->allowedIpsAction(),
-                $this->revokeAction(),
+                // One menu per row keeps the table inside the page width.
+                ActionGroup::make([
+                    $this->rotateAction(),
+                    $this->allowedIpsAction(),
+                    $this->revokeAction(),
+                ])->label('إجراءات')->tooltip('إجراءات المفتاح'),
             ]);
     }
 
@@ -107,7 +114,7 @@ class ApiKeysRelationManager extends RelationManager
                 TextInput::make('name')->label('الاسم')->required()->maxLength(255)
                     ->placeholder('مثال: ERP production'),
                 Radio::make('environment')->label('البيئة')->required()->default('production')->inline()
-                    ->options(['production' => 'Production', 'staging' => 'Staging']),
+                    ->options(['production' => 'إنتاج (production)', 'staging' => 'تجريبي (staging)']),
                 Select::make('scope')->label('الصلاحية')->required()->default('write')
                     ->options([
                         'write' => 'logs:write (إرسال السجلات)',

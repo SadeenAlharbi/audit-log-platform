@@ -19,6 +19,7 @@ class ProjectForm
 
         return $schema->components([
             Section::make('بيانات المشروع')
+                ->columnSpanFull()
                 ->columns(2)
                 ->schema([
                     TextInput::make('name')

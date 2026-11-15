@@ -20,6 +20,12 @@ class PlatformStats extends StatsOverviewWidget
 
     protected ?string $pollingInterval = '60s';
 
+    /** Five cards on one row on wide screens (no half-empty second row). */
+    protected function getColumns(): int|array|null
+    {
+        return ['md' => 3, 'xl' => 5];
+    }
+
     protected function getStats(): array
     {
         $user = auth()->user();

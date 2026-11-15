@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SecurityEvents\Tables;
 
+use App\Filament\Support\Labels;
 use App\Models\Project;
 use App\Services\Security\SecurityEventRecorder;
 use Filament\Actions\ViewAction;
@@ -20,15 +21,16 @@ class SecurityEventsTable
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('created_at')->label('الوقت')->dateTime('Y-m-d H:i:s')->sortable(),
-                TextColumn::make('reason')->label('السبب')->badge()->color('danger'),
-                TextColumn::make('ip')->label('IP')->searchable()->fontFamily('mono')->copyable(),
+                TextColumn::make('reason')->label('السبب')->badge()->color('danger')
+                    ->formatStateUsing(fn (string $state) => Labels::reason($state)),
+                TextColumn::make('ip')->label('عنوان IP')->searchable()->fontFamily('mono')->copyable(),
                 TextColumn::make('project.name')->label('المشروع')->placeholder('غير معروف'),
                 TextColumn::make('apiKey.key_prefix')->label('المفتاح')->fontFamily('mono')->placeholder('—'),
                 TextColumn::make('request_meta.path')->label('المسار')->fontFamily('mono')->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('reason')->label('السبب')->multiple()
-                    ->options(array_combine(SecurityEventRecorder::REASONS, SecurityEventRecorder::REASONS)),
+                    ->options(collect(SecurityEventRecorder::REASONS)->mapWithKeys(fn (string $r) => [$r => Labels::reason($r)])->all()),
                 SelectFilter::make('project_id')->label('المشروع')
                     ->options(fn () => Project::query()->orderBy('name')->pluck('name', 'id')->all()),
                 Filter::make('period')

@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Services\Security\SensitiveDataMasker;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
@@ -17,39 +18,37 @@ class AuditLogInfolist
 {
     public static function configure(Schema $schema): Schema
     {
+        // Reading order: what happened → who did it, to what → what changed →
+        // reference ids. Empty optional fields are hidden instead of showing "—".
         return $schema->components([
-            Grid::make(3)->columnSpanFull()->schema([
-                Section::make('الحدث')->columnSpan(2)->columns(3)->schema([
-                    TextEntry::make('event')->label('الحدث')->fontFamily('mono')->weight('bold'),
-                    TextEntry::make('action')->label('العملية')->badge()
-                        ->formatStateUsing(fn (string $state) => AuditLogsTable::ACTION_LABELS[$state] ?? $state),
-                    TextEntry::make('severity')->label('الخطورة')->badge()
-                        ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
-                        ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
-                    TextEntry::make('project.name')->label('المشروع'),
-                    TextEntry::make('occurred_at')->label('وقت الحدث (UTC)')->dateTime('Y-m-d H:i:s.v'),
-                    TextEntry::make('received_at')->label('وقت الاستلام (UTC)')->dateTime('Y-m-d H:i:s.v'),
-                    TextEntry::make('tags')->label('الوسوم')->badge()->placeholder('—')->columnSpanFull(),
-                ]),
-                Section::make('المعرّفات')->columnSpan(1)->schema([
-                    TextEntry::make('uid')->label('UID')->fontFamily('mono')->copyable(),
-                    TextEntry::make('external_id')->label('external_id')->fontFamily('mono')->placeholder('—')->copyable(),
-                    TextEntry::make('request_id')->label('request_id')->fontFamily('mono')->placeholder('—'),
-                    TextEntry::make('correlation_id')->label('correlation_id')->fontFamily('mono')->placeholder('—'),
-                ]),
+            Section::make('الحدث')->columnSpanFull()->columns(4)->schema([
+                TextEntry::make('event')->label('الحدث')->fontFamily('mono')->weight('bold')->columnSpan(2),
+                TextEntry::make('action')->label('العملية')->badge()
+                    ->formatStateUsing(fn (string $state) => AuditLogsTable::ACTION_LABELS[$state] ?? $state),
+                TextEntry::make('severity')->label('الخطورة')->badge()
+                    ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
+                    ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
+                TextEntry::make('project.name')->label('المشروع'),
+                TextEntry::make('occurred_at')->label('وقت الحدث (UTC)')->dateTime('Y-m-d H:i:s'),
+                TextEntry::make('received_at')->label('وقت الاستلام (UTC)')->dateTime('Y-m-d H:i:s'),
+                TextEntry::make('tags')->label('الوسوم')->badge()
+                    ->visible(fn (AuditLog $record): bool => filled($record->tags)),
             ]),
 
-            Grid::make(2)->columnSpanFull()->schema([
-                Section::make('الفاعل')->columns(2)->schema([
-                    TextEntry::make('actor_type')->label('النوع')->placeholder('—'),
-                    TextEntry::make('actor_id')->label('المعرّف')->placeholder('—'),
-                    TextEntry::make('actor_name')->label('الاسم')->placeholder('—'),
-                    TextEntry::make('actor_ip')->label('IP')->placeholder('—'),
-                    TextEntry::make('user_agent')->label('المتصفح أو الجهاز (User agent)')->placeholder('—')->columnSpanFull(),
-                ]),
-                Section::make('الكيان المتأثر')->columns(2)->schema([
-                    TextEntry::make('subject_type')->label('النوع')->placeholder('—'),
-                    TextEntry::make('subject_id')->label('المعرّف')->placeholder('—'),
+            Section::make('مَن وعلى ماذا')->columnSpanFull()->schema([
+                Grid::make(2)->schema([
+                    Fieldset::make('الفاعل')->columns(2)->schema([
+                        TextEntry::make('actor_name')->label('الاسم')->placeholder('—'),
+                        TextEntry::make('actor_id')->label('المعرّف')->placeholder('—'),
+                        TextEntry::make('actor_type')->label('النوع')->placeholder('—'),
+                        TextEntry::make('actor_ip')->label('عنوان IP')->placeholder('—'),
+                        TextEntry::make('user_agent')->label('المتصفح أو الجهاز')->columnSpanFull()
+                            ->visible(fn (AuditLog $record): bool => filled($record->user_agent)),
+                    ]),
+                    Fieldset::make('الكيان المتأثر')->columns(2)->schema([
+                        TextEntry::make('subject_type')->label('النوع')->placeholder('—'),
+                        TextEntry::make('subject_id')->label('المعرّف')->placeholder('—'),
+                    ]),
                 ]),
             ]),
 
@@ -69,9 +68,19 @@ class AuditLogInfolist
                     }),
                 ]),
 
+            Section::make('المعرّفات المرجعية')->columnSpanFull()->columns(4)->collapsible()->schema([
+                TextEntry::make('uid')->label('رقم السجل (UID)')->fontFamily('mono')->copyable()->columnSpan(2),
+                TextEntry::make('external_id')->label('المعرّف في النظام المرسل')->fontFamily('mono')->placeholder('—')->copyable()->columnSpan(2),
+                TextEntry::make('request_id')->label('request_id')->fontFamily('mono')->columnSpan(2)
+                    ->visible(fn (AuditLog $record): bool => filled($record->request_id)),
+                TextEntry::make('correlation_id')->label('correlation_id')->fontFamily('mono')->columnSpan(2)
+                    ->visible(fn (AuditLog $record): bool => filled($record->correlation_id)),
+            ]),
+
             Section::make('بيانات إضافية (metadata)')
                 ->columnSpanFull()
                 ->collapsed()
+                ->visible(fn (AuditLog $record): bool => filled($record->metadata))
                 ->schema([
                     KeyValueEntry::make('metadata')
                         ->hiddenLabel()

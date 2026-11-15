@@ -1,70 +1,71 @@
-# Audit Log Hub · منصة Audit Log المركزية
+# Audit Log Hub
 
-منصة مركزية تستقبل سجلات التدقيق من كل أنظمة الشركة عبر REST API، وتحفظها بشكل **غير قابل للتعديل أو الحذف**، مع فصل كامل لبيانات كل مشروع، ولوحة تحكم عربية (Filament 5) للبحث والتصدير والإدارة.
+A central platform that receives audit logs from every company system over a REST API, stores them **append-only** (no update, no delete), keeps each project's data fully isolated, and provides an Arabic dashboard (Filament 5) for search, export and administration.
 
-**التقنيات:** Laravel 13 · PHP 8.4 · Filament 5 · MariaDB 11.8 · Redis · Horizon · Node 24 · Docker
+**Stack:** Laravel 13 · PHP 8.4 · Filament 5 · MariaDB 11.8 · Redis · Horizon · Node 24 · Docker
 
 ---
 
-## التشغيل
+## Getting started
 
-المتطلب الوحيد على الجهاز: **Docker Desktop**.
+The only requirement on your machine is **Docker Desktop**.
 
 ```bash
 ./bin/setup
 ```
 
-السكربت آمن لإعادة التشغيل، ويقوم بالآتي:
-1. ينشئ `.env` بكلمات مرور عشوائية.
-2. يبني الصور ويثبّت الحزم.
-3. يولّد مفتاح تشفير النسخ الاحتياطية (age).
-4. يشغّل الخدمات وينفّذ `migrate --seed`.
+The script is safe to re-run. It:
+1. Creates `.env` with random passwords.
+2. Builds the images and installs dependencies.
+3. Generates the backup encryption key (age).
+4. Starts the services and runs `migrate --seed`.
 
-لإنشاء أول Super Admin: عبّئ `ADMIN_EMAIL` (بأحرف صغيرة) و`ADMIN_PASSWORD` في `.env` ثم شغّل `make seed`. عند أول دخول يُطلب منك تفعيل المصادقة الثنائية (تطبيق Authenticator).
+To create the first Super Admin, set `ADMIN_EMAIL` (lowercase) and `ADMIN_PASSWORD` in `.env`, then run `make seed`. On first sign-in you are asked to set up two-factor authentication (any Authenticator app).
 
-بعد ذلك يكفي `docker compose up -d`.
+After that, `docker compose up -d` is all you need.
 
-| الرابط | الوصف |
+| URL | Description |
 |---|---|
-| http://localhost:8080/admin | لوحة التحكم |
-| http://localhost:8080/api/v1 | الـ API ([التوثيق](http://localhost:8080/docs/api)) |
-| http://localhost:8080/horizon | مراقبة الطوابير (Super Admin) |
-| http://localhost:8080/telescope | Telescope (التطوير فقط) |
+| http://localhost:8080/admin | Dashboard |
+| http://localhost:8080/api/v1 | API ([docs](http://localhost:8080/docs/api)) |
+| http://localhost:8080/horizon | Queue monitoring (Super Admin) |
+| http://localhost:8080/telescope | Telescope (development only) |
 
-### الخدمات
+### Services
 
-| الخدمة | الدور |
+| Service | Role |
 |---|---|
 | `app` | PHP 8.4-FPM |
-| `nginx` | الواجهة على المنفذ 8080 |
-| `mariadb` | MariaDB 11.8 مع Binary Logs، ومتاحة على `127.0.0.1:33060` |
-| `redis` | الطوابير والكاش والجلسات والـ Rate limiting |
-| `queue-worker` | Horizon: يخزّن السجلات المستلمة |
-| `scheduler` | المهام المجدولة: الأقسام، الأرشفة، الاحتفاظ، النسخ، التنبيهات |
-| `backup` | mariadb-backup كامل يوميًا وتزايدي كل ساعة، Binary Logs، تشفير age، رفع rclone (في الإنتاج)، اختبار استعادة أسبوعي |
+| `nginx` | Web server on port 8080 |
+| `mariadb` | MariaDB 11.8 with binary logs, on `127.0.0.1:33060` |
+| `redis` | Queues, cache, sessions and rate limiting |
+| `queue-worker` | Horizon: stores received logs |
+| `scheduler` | Scheduled tasks: partitions, archiving, retention, backups, alerts |
+| `backup` | Daily full and hourly incremental mariadb-backup, binary logs, age encryption, rclone upload (production), weekly restore test |
 
-> في التطوير يُحفظ الأرشيف والنسخ محليًا (`storage/app/archive` و`storage/app/backups` وvolume `backups`). في الإنتاج تُوجَّه إلى S3 خارج الخادم (Runbook §1).
+> In development the archive and backups stay local (`storage/app/archive`, `storage/app/backups` and the `backups` volume). In production they go to off-server S3 (runbook §1).
 
-### أوامر مفيدة
+### Useful commands
 
 ```bash
-make help        # كل الأوامر
-make ps          # حالة الخدمات والـ healthchecks
-make demo        # بيانات تجريبية للمراجعة: 4 أنظمة وحساب لكل دور (التطوير فقط)
-make test        # الاختبارات (قاعدة audit_testing)
+make help        # all commands
+make ps          # service status and health checks
+make demo        # demo data: 4 systems and one account per role (development only)
+make test        # test suite (audit_testing database)
 make lint        # Pint
-make analyse     # PHPStan / Larastan مستوى 6
-./bin/doctor     # فحص شامل، والتقرير في storage/logs/doctor.log
-make partitions  # أقسام audit_logs
-make schema-dump # تحديث database/schema/schema.sql
+make analyse     # PHPStan / Larastan level 6
+make fresh       # rebuild the database from scratch
+./bin/doctor     # full health check, report in storage/logs/doctor.log
+make partitions  # audit_logs partitions
+make schema-dump # refresh database/schema/schema.sql
 ```
 
 ---
 
-## ربط نظام بالمنصة (باختصار)
+## Connecting a system
 
-1. من اللوحة: **المشاريع ← إنشاء**. يُنشأ الـ slug ومفتاح API، ويُعرض المفتاح **مرة واحدة فقط**.
-2. أرسل السجلات:
+1. In the dashboard: **Projects → Create**. A slug and an API key are generated; the key is shown **only once**.
+2. Send logs:
 
 ```bash
 curl -X POST https://audit.example.com/api/v1/logs \
@@ -75,7 +76,7 @@ curl -X POST https://audit.example.com/api/v1/logs \
        "old_values":{"status":"pending"},"new_values":{"status":"paid"}}'
 ```
 
-3. مشاريع Laravel تستخدم الحزمة `company/audit-client` من مستودعها الخاص [SadeenAlharbi/audit-client](https://github.com/SadeenAlharbi/audit-client):
+3. Laravel projects can use the `company/audit-client` package from its private repository, [SadeenAlharbi/audit-client](https://github.com/SadeenAlharbi/audit-client):
 
 ```json
 "repositories": [{ "type": "vcs", "url": "git@github.com:SadeenAlharbi/audit-client.git" }]
@@ -85,41 +86,55 @@ curl -X POST https://audit.example.com/api/v1/logs \
 composer require company/audit-client:^1.0
 ```
 
-التفاصيل الكاملة: [docs/integration-guide.md](docs/integration-guide.md). العقد الرسمي: [docs/openapi.yaml](docs/openapi.yaml).
+Full details: [docs/integration-guide.md](docs/integration-guide.md). API contract: [docs/openapi.yaml](docs/openapi.yaml).
 
 ---
 
-## الوثائق
+## How it works
 
-| الوثيقة | المحتوى |
+- **Ingestion:** `POST /api/v1/logs` (or `/logs/batch`, up to 500) is authenticated by a hashed API key, optionally HMAC-signed, validated, de-duplicated by `external_id`, answered with `202`, and stored by a queue worker.
+- **Immutability:** database triggers reject every `UPDATE` and `DELETE` on `audit_logs`; only the archiver account may delete, and only after the data is archived.
+- **Isolation:** every query is scoped to the projects the user or API key may access.
+- **Sensitive data:** credentials (passwords, tokens, card numbers) are removed before storage; personal data is masked on display unless the viewer has the "view sensitive data" permission.
+- **Retention:** monthly partitions; logs are archived as compressed JSONL, kept for a grace period, then deleted according to each project's retention.
+- **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site, with a weekly automated restore test.
+- **Dashboard roles:** Super Admin, Platform Auditor, Security Officer, Project Owner, Project Viewer, plus custom roles. Two-factor authentication is mandatory for platform-wide roles.
+
+---
+
+## Documentation
+
+| Document | Contents |
 |---|---|
-| [docs/integration-guide.md](docs/integration-guide.md) | دليل الربط: المصادقة، التوقيع، الأمثلة (cURL / PHP / Node / Python / Laravel)، الأخطاء |
-| [docs/openapi.yaml](docs/openapi.yaml) | عقد الـ API (OpenAPI 3.1)، ويُعرض في `/docs/api` |
-| [docs/runbook.md](docs/runbook.md) | دليل التشغيل: النشر، النسخ، الاستعادة الكاملة والجزئية، تدوير المفاتيح، الحوادث |
-| [docs/permissions-matrix.md](docs/permissions-matrix.md) | مصفوفة الأدوار والصلاحيات، وهي مختبرة آليًا |
-| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) | المخطط والـ ERD |
-| [docs/decisions.md](docs/decisions.md) | القرارات التقنية وأسبابها |
-| [docs/security-review.md](docs/security-review.md) | المراجعة الأمنية النهائية |
-| [docs/plan-compliance.md](docs/plan-compliance.md) | كل متطلب في وثيقة الخطة، وأين نُفّذ، وكيف اختُبر |
-| [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | الوثيقة التعريفية بالمنتج: الهدف، والأدوار، ورحلة السجل، والشاشات |
-| [docs/reports/](docs/reports/) | تقارير اختبار الاستعادة |
+| [docs/integration-guide.md](docs/integration-guide.md) | Integration guide: authentication, signing, examples (cURL / PHP / Node / Python / Laravel), errors |
+| [docs/openapi.yaml](docs/openapi.yaml) | API contract (OpenAPI 3.1), served at `/docs/api` |
+| [docs/runbook.md](docs/runbook.md) | Operations: deployment, backups, full and per-project restore, key rotation, incidents |
+| [docs/permissions-matrix.md](docs/permissions-matrix.md) | Roles and permissions matrix (covered by automated tests) |
+| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) | Schema and ERD |
+| [docs/decisions.md](docs/decisions.md) | Technical decisions and their reasons |
+| [docs/security-review.md](docs/security-review.md) | Security review |
+| [docs/plan-compliance.md](docs/plan-compliance.md) | Every requirement of the plan, where it is implemented and how it is tested |
+| [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | Product overview: purpose, roles, the life of a log, screens |
+| [docs/reports/](docs/reports/) | Restore test reports |
+
+Most documents under `docs/` are written in Arabic.
 
 ---
 
-## الجودة
+## Quality
 
-- **Pest:** 194 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
-- **التغطية:** الحد الأدنى 80% لطبقة الـ API، ويفرضه `bin/coverage-api` في CI.
-- **Pint + PHPStan مستوى 6:** بدون أخطاء.
-- **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml)، يشغّل كل الفحوص داخل Docker، ويبني صور الإنتاج، ويفحص ملف OpenAPI.
+- **Pest:** 194 tests against a real MariaDB (partitioning and triggers need the real engine).
+- **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api`.
+- **Pint + PHPStan level 6:** no errors.
+- **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.
 
-## الأمان
+## Security
 
-- لا تُرفع أسرار إلى المستودع: `.env` و`secrets/` (مفتاح age الخاص) مستثناة في `.gitignore`.
-- في الإنتاج اضبط `APP_ENV=production` ولا تعطّل HTTPS (`AUDIT_API_REQUIRE_HTTPS`). التفاصيل في [docs/runbook.md](docs/runbook.md).
+- No secrets in the repository: `.env` and `secrets/` (the private age key) are git-ignored.
+- In production set `APP_ENV=production` and keep HTTPS enforced (`AUDIT_API_REQUIRE_HTTPS`). See [docs/runbook.md](docs/runbook.md).
 
-## سياسة الـ Migrations
+## Migration policy
 
-- Migration واحد لكل جدول، يحتوي الأعمدة والفهارس والقيود والـ Triggers كاملة.
-- **قبل أول نشر:** يُعدَّل ملف الجدول الأصلي ثم يُشغَّل `make fresh`، ولا تُضاف Migrations من نوع alter.
-- **بعد أول نشر:** تُقبل Migrations إضافية فقط، قابلة للتراجع، مع `down()` مختبر.
+- One migration per table, containing all its columns, indexes, constraints and triggers.
+- **Before the first deployment:** edit the table's original migration and run `make fresh`; no "alter" migrations.
+- **After the first deployment:** only additional, reversible migrations with a tested `down()`.

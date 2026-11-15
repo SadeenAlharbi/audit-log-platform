@@ -94,7 +94,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Build prod app image (PHP 8.4-FPM + Node 24 assets)
+      - name: Build prod app image (PHP 8.4-FPM)
         run: docker build --target prod -t audit-log-platform/app:ci .
       - name: Build backup image
         run: docker build -f docker/backup/Dockerfile -t audit-log-platform/backup:ci .

@@ -20,14 +20,9 @@
 3. يولّد مفتاح تشفير النسخ الاحتياطية (age).
 4. يشغّل الخدمات وينفّذ `migrate --seed`.
 
-لإنشاء أول Super Admin: عبّئ `ADMIN_EMAIL` و`ADMIN_PASSWORD` في `.env` ثم شغّل `make seed`. عند أول دخول يُطلب منك تفعيل المصادقة الثنائية (تطبيق Authenticator).
+لإنشاء أول Super Admin: عبّئ `ADMIN_EMAIL` (بأحرف صغيرة) و`ADMIN_PASSWORD` في `.env` ثم شغّل `make seed`. عند أول دخول يُطلب منك تفعيل المصادقة الثنائية (تطبيق Authenticator).
 
 بعد ذلك يكفي `docker compose up -d`.
-
-> **الترقية من نسخة الأسبوع الأول:** تغيّرت حسابات قاعدة البيانات (فصل حساب التشغيل عن حساب الصيانة)، وأُضيفت خدمات جديدة. ولا توجد بيانات حقيقية بعد، فابدأ بقاعدة نظيفة مرة واحدة:
-> ```bash
-> docker compose down -v && ./bin/setup
-> ```
 
 | الرابط | الوصف |
 |---|---|
@@ -80,7 +75,15 @@ curl -X POST https://audit.example.com/api/v1/logs \
        "old_values":{"status":"pending"},"new_values":{"status":"paid"}}'
 ```
 
-3. مشاريع Laravel تستخدم الحزمة `company/audit-client` (ريبو مستقل).
+3. مشاريع Laravel تستخدم الحزمة `company/audit-client` من مستودعها الخاص [SadeenAlharbi/audit-client](https://github.com/SadeenAlharbi/audit-client):
+
+```json
+"repositories": [{ "type": "vcs", "url": "git@github.com:SadeenAlharbi/audit-client.git" }]
+```
+
+```bash
+composer require company/audit-client:^1.0
+```
 
 التفاصيل الكاملة: [docs/integration-guide.md](docs/integration-guide.md). العقد الرسمي: [docs/openapi.yaml](docs/openapi.yaml).
 
@@ -105,10 +108,15 @@ curl -X POST https://audit.example.com/api/v1/logs \
 
 ## الجودة
 
-- **Pest:** 190 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
-- **التغطية:** طبقة الـ API 95% والمشروع كله 90% (الحد الأدنى 80%، ويفرضه `bin/coverage-api` في CI).
+- **Pest:** 194 اختبارًا على MariaDB حقيقية (التقسيم والـ Triggers تحتاج المحرك الحقيقي).
+- **التغطية:** الحد الأدنى 80% لطبقة الـ API، ويفرضه `bin/coverage-api` في CI.
 - **Pint + PHPStan مستوى 6:** بدون أخطاء.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml)، يشغّل كل الفحوص داخل Docker، ويبني صور الإنتاج، ويفحص ملف OpenAPI.
+
+## الأمان
+
+- لا تُرفع أسرار إلى المستودع: `.env` و`secrets/` (مفتاح age الخاص) مستثناة في `.gitignore`.
+- في الإنتاج اضبط `APP_ENV=production` ولا تعطّل HTTPS (`AUDIT_API_REQUIRE_HTTPS`). التفاصيل في [docs/runbook.md](docs/runbook.md).
 
 ## سياسة الـ Migrations
 

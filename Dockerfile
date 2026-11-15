@@ -1,27 +1,17 @@
 # syntax=docker/dockerfile:1.7
 #
 # Multi-stage image for the Audit Log Platform.
-#   assets -> Node 24 builds front-end assets with Vite
 #   base   -> PHP 8.4-FPM with every extension the platform needs
 #   dev    -> base + source mounted from the host (used by docker-compose.yml)
-#   prod   -> base + code, production vendor and built assets baked in
+#   prod   -> base + code and production vendor baked in
+#   web    -> nginx with the public assets
+#
+# The dashboard is Filament (assets shipped by the package), so there is no
+# front-end build. Node 24 is used by CI for the OpenAPI lint.
 #
 # The PHP and Node versions are contractual (plan §2) - do not change them.
 
 ARG PHP_VERSION=8.4
-ARG NODE_VERSION=24
-
-############################
-# assets: Node 24
-############################
-FROM node:${NODE_VERSION}-alpine AS assets
-WORKDIR /app
-COPY package.json package-lock.json* .npmrc ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
-COPY vite.config.js ./
-COPY resources ./resources
-COPY public ./public
-RUN npm run build
 
 ############################
 # base: PHP 8.4-FPM
@@ -69,7 +59,6 @@ COPY composer.json composer.lock* ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
 
 COPY . .
-COPY --from=assets /app/public/build ./public/build
 
 RUN composer dump-autoload --optimize --classmap-authoritative --no-dev \
     && php artisan package:discover --ansi \

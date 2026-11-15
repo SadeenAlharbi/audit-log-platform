@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Models\Concerns\AppendOnly;
 use App\Models\Scopes\ProjectAccessScope;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -93,17 +92,5 @@ class AuditLog extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(IngestionBatch::class);
-    }
-
-    /** @param Builder<self> $query */
-    public function scopeForProject(Builder $query, int $projectId): void
-    {
-        $query->where('project_id', $projectId);
-    }
-
-    /** @param Builder<self> $query */
-    public function scopeOccurredBetween(Builder $query, \DateTimeInterface $from, \DateTimeInterface $to): void
-    {
-        $query->whereBetween('occurred_at', [$from, $to]);
     }
 }

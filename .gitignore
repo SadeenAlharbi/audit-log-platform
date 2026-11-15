@@ -32,3 +32,6 @@ Thumbs.db
 /public/css/filament
 /public/js/filament
 /public/fonts/filament
+
+# The plan document stays on the owner's machine only.
+/Audit-Log-Platform-Plan-v*.pdf

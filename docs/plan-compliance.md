@@ -7,7 +7,7 @@
 | المتطلب | الحالة | الدليل |
 |---|---|---|
 | Laravel 13 + PHP 8.4 فقط | ✓ | `composer.json` (`"php": "^8.4"`، `"laravel/framework": "^13.0"`)، `Dockerfile` (`php:8.4-fpm`). الـ CI يفشل إن تغيّرت |
-| Node 24+ | ✓ | `package.json` engines، `.nvmrc`، `node:24-alpine` |
+| Node 24+ | ✓ | `package.json` engines، `.nvmrc`، CI (OpenAPI lint) |
 | Filament 5 | ✓ | `filament/filament ^5.0` |
 | Migrations نظيفة ونهائية | ✓ | 17 Migration، واحد لكل جدول، ولم يتغير أي منها منذ تجميد المخطط |
 

@@ -9,6 +9,10 @@ use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\RenderHook;
+use Filament\Schemas\Schema;
+use Filament\View\PanelsRenderHook;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -31,7 +35,7 @@ class Login extends BaseLogin
         parent::mount();
 
         if ($message = session()->pull(HandleSamlSignIn::DENIED)) {
-            Notification::make()->title('تعذّر الدخول عبر SAML')->body((string) $message)->danger()->send();
+            Notification::make()->title('تعذّر الدخول الموحد')->body((string) $message)->danger()->send();
         }
 
         $pending = $this->pendingSamlUser();
@@ -77,7 +81,7 @@ class Login extends BaseLogin
 
         if ($user === null || ! $this->isUserAllowedToAccessPanel($user)) {
             $this->cancelSamlChallenge();
-            Notification::make()->title('انتهت مهلة الدخول عبر SAML')->body('ابدأ الدخول من جديد.')->danger()->send();
+            Notification::make()->title('انتهت مهلة الدخول الموحد')->body('ابدأ الدخول من جديد.')->danger()->send();
 
             return null;
         }
@@ -97,20 +101,26 @@ class Login extends BaseLogin
         return app(LoginResponse::class);
     }
 
-    /** @return array<int, Action> */
-    protected function getFormActions(): array
+    /** The single sign-on button sits under the password form, full width. */
+    public function content(Schema $schema): Schema
     {
-        $actions = parent::getFormActions();
-
-        if (config('audit.saml.enabled') && filled(config('audit.saml.tenant_uuid'))) {
-            $actions[] = Action::make('saml')
-                ->label((string) config('audit.saml.button_label'))
-                ->color('gray')
-                ->outlined()
-                ->url('/saml2/'.config('audit.saml.tenant_uuid').'/login');
-        }
-
-        return $actions;
+        return $schema->components([
+            RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE),
+            $this->getFormContentComponent(),
+            Actions::make([
+                Action::make('saml')
+                    ->label((string) config('audit.saml.button_label'))
+                    ->color('gray')
+                    ->outlined()
+                    ->url('/saml2/'.config('audit.saml.tenant_uuid').'/login'),
+            ])
+                ->fullWidth()
+                ->key('sso-actions')
+                ->visible(fn (): bool => blank($this->userUndertakingMultiFactorAuthentication)
+                    && config('audit.saml.enabled') && filled(config('audit.saml.tenant_uuid'))),
+            $this->getMultiFactorChallengeFormContentComponent(),
+            RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
+        ]);
     }
 
     /** @return array<int, Action> */

@@ -133,7 +133,7 @@ it('publishes the SP metadata, and nothing while SAML is off', function () {
 });
 
 it('shows the SAML button on the login page only when enabled', function () {
-    $this->get('/admin/login')->assertOk()->assertSee('/saml2/'.SAML_UUID.'/login', false)->assertSee('الدخول عبر SAML');
+    $this->get('/admin/login')->assertOk()->assertSee('/saml2/'.SAML_UUID.'/login', false)->assertSee('الدخول الموحد');
 
     config(['audit.saml.enabled' => false]);
     $this->get('/admin/login')->assertOk()->assertDontSee('/saml2/'.SAML_UUID.'/login', false);
@@ -261,7 +261,7 @@ it('sets up 2FA after SAML without asking for a platform password', function () 
     $user = samlAccount();
     postSaml($this, 'sara@company.test');
 
-    $page = Livewire::test(SetUpTwoFactor::class)->assertSee('دخلت عبر SAML');
+    $page = Livewire::test(SetUpTwoFactor::class)->assertSee('دخلت بالدخول الموحد');
     $secret = mountTwoFactorSetup($page);
 
     $page->setActionData(['code' => app(Google2FA::class)->getCurrentOtp($secret)])

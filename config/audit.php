@@ -186,7 +186,7 @@ return [
         // /saml2/{uuid}/metadata (entity id), /saml2/{uuid}/acs, /saml2/{uuid}/sls
         'tenant_uuid' => env('SAML2_TENANT_UUID'),
         // Button label on the login page (e.g. the company's IdP name).
-        'button_label' => env('SAML2_BUTTON_LABEL') ?: 'الدخول عبر SAML',
+        'button_label' => env('SAML2_BUTTON_LABEL') ?: 'الدخول الموحد',
         // With a metadata URL, the entity id, login/logout URLs and signing
         // certificate are read from it; any value set below overrides it.
         'idp' => [

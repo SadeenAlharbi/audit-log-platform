@@ -21,7 +21,7 @@ class SetUpTwoFactor extends SetUpRequiredMultiFactorAuthentication
         $who = $user ? ' (حسابك: '.$user->email.')' : '';
 
         return session('auth.via') === 'saml'
-            ? 'دخلت عبر SAML'.$who.'. المنصة تطلب أيضًا رمزًا من تطبيق المصادقة عند كل دخول، فأعدّه مرة واحدة الآن.'
+            ? 'دخلت بالدخول الموحد'.$who.'. المنصة تطلب أيضًا رمزًا من تطبيق المصادقة عند كل دخول، فأعدّه مرة واحدة الآن.'
             : parent::getSubheading();
     }
 

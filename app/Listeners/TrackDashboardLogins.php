@@ -65,7 +65,12 @@ class TrackDashboardLogins
             'locked_until' => $lock ? now()->addMinutes((int) config('audit.accounts.lockout_minutes', 15)) : $user->locked_until,
         ])->saveQuietly();
 
-        $this->audit->record($lock ? 'auth.account_locked' : 'auth.login_failed', $user, ['attempts' => $attempts, 'ip' => request()->ip()]);
+        $this->audit->record($lock ? 'auth.account_locked' : 'auth.login_failed', $user, [
+            'attempts' => $attempts,
+            // "password" or "mfa" (a wrong 2FA code, after a password or SAML).
+            'stage' => $event->credentials['stage'] ?? 'password',
+            'ip' => request()->ip(),
+        ]);
     }
 
     private function login(Login $event): void

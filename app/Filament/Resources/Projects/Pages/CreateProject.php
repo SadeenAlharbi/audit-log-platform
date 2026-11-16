@@ -17,6 +17,9 @@ class CreateProject extends CreateRecord
 {
     protected static string $resource = ProjectResource::class;
 
+    /** Only "add" and "cancel": no "add and start another" button. */
+    protected static bool $canCreateAnother = false;
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = auth()->id();

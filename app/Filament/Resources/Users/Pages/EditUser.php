@@ -10,6 +10,12 @@ class EditUser extends EditRecord
 {
     protected static string $resource = UserResource::class;
 
+    /** Back to the list after saving. */
+    protected function getRedirectUrl(): string
+    {
+        return UserResource::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return []; // users are deactivated, never deleted

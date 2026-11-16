@@ -38,9 +38,14 @@ it('warns about keys that expire soon', function () {
 it('locks a dashboard account after 5 failed logins', function () {
     $user = User::factory()->create(['email' => 'x@example.com']);
 
-    foreach (range(1, 5) as $i) {
-        event(new Failed('web', $user, ['email' => 'x@example.com']));
+    // Each failure counts once (listeners must not be registered twice).
+    foreach (range(1, 4) as $i) {
+        event(new Failed('web', $user->fresh(), ['email' => 'x@example.com']));
+        expect($user->fresh()->failed_login_attempts)->toBe($i);
     }
+    expect($user->fresh()->isLocked())->toBeFalse();
+
+    event(new Failed('web', $user->fresh(), ['email' => 'x@example.com']));
 
     expect($user->fresh()->isLocked())->toBeTrue()
         ->and(PlatformAudit::query()->where('action', 'auth.account_locked')->exists())->toBeTrue();

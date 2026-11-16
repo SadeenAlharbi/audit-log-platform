@@ -6,7 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Project;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
@@ -34,6 +34,25 @@ class AuditLogsTable
     public const SEVERITY_LABELS = ['info' => 'معلومة', 'warning' => 'تحذير', 'critical' => 'حرج'];
 
     public const SEVERITY_COLORS = ['info' => 'gray', 'warning' => 'warning', 'critical' => 'danger'];
+
+    /**
+     * A searchable list: opens with the recent values, typing searches all.
+     *
+     * @param  callable(?string): array<string, string>  $options
+     * @param  (callable(string): string)|null  $optionLabel
+     */
+    private static function listFilter(string $name, string $label, ?string $placeholder, callable $options, ?callable $optionLabel = null): Select
+    {
+        return Select::make($name)
+            ->label($label)
+            ->placeholder($placeholder ?? 'الكل')
+            ->searchable()
+            ->searchPrompt('اكتب للبحث')
+            ->noSearchResultsMessage('لا توجد قيمة مطابقة')
+            ->options(fn () => $options(null))
+            ->getSearchResultsUsing(fn (string $search) => $options($search))
+            ->getOptionLabelUsing(fn ($value) => $optionLabel ? $optionLabel((string) $value) : (string) $value);
+    }
 
     public static function configure(Table $table): Table
     {
@@ -73,8 +92,10 @@ class AuditLogsTable
                 Filter::make('period')
                     ->label('الفترة')
                     ->schema([
-                        DateTimePicker::make('from')->label('من')->default(now()->subDays(7)->startOfDay())->required(),
-                        DateTimePicker::make('until')->label('إلى'),
+                        DateTimePicker::make('from')->label('من')->default(now()->subDays(7)->startOfDay())->required()
+                            ->native(false)->seconds(false)->displayFormat('Y/m/d  H:i')->firstDayOfWeek(7),
+                        DateTimePicker::make('until')->label('إلى')
+                            ->native(false)->seconds(false)->displayFormat('Y/m/d  H:i')->firstDayOfWeek(7),
                     ])
                     ->columns(2)
                     ->columnSpan(2)
@@ -96,16 +117,28 @@ class AuditLogsTable
 
                 Filter::make('details')
                     ->label('تفاصيل')
+                    // Lists of the values actually received, searchable by
+                    // typing (AuditLogFilterOptions).
                     ->schema([
-                        TextInput::make('event')->label('الحدث (يدعم user.*)'),
-                        TextInput::make('action')->label('العملية'),
-                        TextInput::make('actor_id')->label('معرّف الفاعل'),
-                        TextInput::make('subject_type')->label('نوع الكيان'),
-                        TextInput::make('subject_id')->label('معرّف الكيان'),
-                        TextInput::make('tag')->label('وسم'),
-                        TextInput::make('correlation_id')->label('correlation_id'),
+                        self::listFilter('event', 'الحدث', null,
+                            fn (?string $search) => AuditLogFilterOptions::events($search))
+                            ->helperText('القيم المنتهية بـ .* تختار عائلة كاملة، مثل user.*'),
+                        self::listFilter('action', 'العملية', null,
+                            fn (?string $search) => AuditLogFilterOptions::actions($search),
+                            fn (string $value) => AuditLogFilterOptions::actionLabel($value)),
+                        self::listFilter('actor_id', 'الفاعل', null,
+                            fn (?string $search) => AuditLogFilterOptions::actors($search),
+                            fn (string $value) => AuditLogFilterOptions::actors($value)[$value] ?? $value),
+                        self::listFilter('subject_type', 'نوع الكيان', null,
+                            fn (?string $search) => AuditLogFilterOptions::values('subject_type', $search)),
+                        self::listFilter('subject_id', 'معرّف الكيان', null,
+                            fn (?string $search) => AuditLogFilterOptions::values('subject_id', $search)),
+                        self::listFilter('tag', 'الوسم', null,
+                            fn (?string $search) => AuditLogFilterOptions::tags($search)),
+                        self::listFilter('correlation_id', 'correlation_id', null,
+                            fn (?string $search) => AuditLogFilterOptions::values('correlation_id', $search)),
                     ])
-                    ->columns(4)
+                    ->columns(3)
                     ->columnSpanFull()
                     ->query(function (Builder $query, array $data) {
                         foreach (['action', 'actor_id', 'subject_type', 'subject_id', 'correlation_id'] as $field) {
@@ -126,7 +159,7 @@ class AuditLogsTable
             ], layout: FiltersLayout::Dropdown)
             // The filter button sits beside the search box; the panel opens wide.
             ->filtersFormColumns(2)
-            ->filtersFormWidth(Width::ThreeExtraLarge)
+            ->filtersFormWidth(Width::FourExtraLarge)
             ->recordActions([
                 ViewAction::make(),
             ])

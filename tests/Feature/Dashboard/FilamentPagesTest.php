@@ -2,6 +2,7 @@
 
 use App\Filament\Resources\AuditLogs\AuditLogResource;
 use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
+use App\Filament\Resources\AuditLogs\Tables\AuditLogFilterOptions;
 use App\Filament\Resources\BackupRuns\Pages\ListBackupRuns;
 use App\Filament\Resources\PlatformAudits\Pages\ListPlatformAudits;
 use App\Filament\Resources\Projects\Pages\CreateProject;
@@ -12,6 +13,7 @@ use App\Filament\Resources\Roles\Pages\ListRoles;
 use App\Filament\Resources\SecurityEvents\Pages\ListSecurityEvents;
 use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
+use App\Models\AuditLog;
 use App\Models\PlatformAudit;
 use App\Models\Project;
 use App\Models\ProjectApiKey;
@@ -72,6 +74,24 @@ it('shows a project viewer only their project\'s logs', function () {
         ->assertCanNotSeeTableRecords([$logB]);
 
     $this->get("/admin/audit-logs/{$logB->uid}")->assertNotFound();
+});
+
+it('offers only received values of visible projects in the filter lists', function () {
+    [$a, $b] = Project::factory()->count(2)->create();
+    makeAuditLog($a, ['event' => 'employee.salary.updated', 'actor_id' => '7', 'actor_name' => 'Reem', 'tags' => ['hr']]);
+    makeAuditLog($b, ['event' => 'secret.thing', 'actor_id' => '9', 'tags' => ['other']]);
+
+    $this->actingAs(projectUser($a, 'project_viewer'));
+
+    expect(AuditLogFilterOptions::events())->toHaveKeys(['employee.*', 'employee.salary.*', 'employee.salary.updated'])
+        ->not->toHaveKey('secret.thing')
+        ->and(AuditLogFilterOptions::actors('ree'))->toBe(['7' => 'Reem (user #7)'])
+        ->and(AuditLogFilterOptions::tags())->toBe(['hr' => 'hr'])
+        ->and(AuditLogFilterOptions::events('secret'))->toBe([]);
+
+    Livewire::test(ListAuditLogs::class)
+        ->filterTable('details', ['event' => 'employee.*'])
+        ->assertCanSeeTableRecords(AuditLog::query()->where('event', 'employee.salary.updated')->get());
 });
 
 it('forbids admin areas to project users', function () {

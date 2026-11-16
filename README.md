@@ -130,7 +130,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 217 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
+- **Pest:** 220 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
 - **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api` (95.3% on 2026-11-16, [report](docs/reports/coverage-2026-11-16.md)).
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.
@@ -150,7 +150,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Handover notes
 
-**Status (2026-11-16):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
+**Status (2026-11-16):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved; D20 sets the severity criteria the plan leaves open. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
 
 ### Where things are
 
@@ -171,7 +171,7 @@ Most documents under `docs/` are written in Arabic.
 
 - Code, comments and commit messages in English; the dashboard and most documents in Arabic.
 - Every change comes with tests; `./bin/doctor` must end without errors before a push (tests, Pint, PHPStan, clock and off-site checks).
-- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D20).
+- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D21).
 - `app/Filament/Auth/SetUpAppAuthenticationAction.php` is a copy of a Filament class with two changes (see its header): re-check it when upgrading Filament.
 
 ### Before production

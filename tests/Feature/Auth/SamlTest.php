@@ -318,3 +318,30 @@ it('warns on the login page when the server clock is off', function () {
         ->assertSee('alh-clock-warning', false)
         ->assertSee('Date.now()', false);
 });
+
+it('locks the account after five wrong 2FA codes following a SAML sign-in', function () {
+    $user = samlAccount('super_admin', withMfa: true);
+    postSaml($this, 'sara@company.test');
+
+    foreach (range(1, 5) as $i) {
+        Livewire::test(Login::class)
+            ->set('data.multiFactor.app.code', '000000')
+            ->call('authenticate')
+            ->assertHasErrors('data.multiFactor.app.code');
+        expect($user->fresh()->failed_login_attempts)->toBe($i === 5 ? 0 : $i);
+    }
+    expect($user->fresh()->isLocked())->toBeTrue();
+
+    // The right code is refused, with the reason (after the form's own
+    // limit of 5 submissions a minute).
+    $this->travel(61)->seconds();
+    Livewire::test(Login::class)
+        ->set('data.multiFactor.app.code', app(Google2FA::class)->getCurrentOtp('JBSWY3DPEHPK3PXP'))
+        ->call('authenticate')
+        ->assertNotified('تعذّر الدخول');
+    $this->assertGuest();
+
+    // And a new SAML sign-in is refused too.
+    postSaml($this, 'sara@company.test');
+    expect(session(HandleSamlSignIn::DENIED))->toBeString();
+});

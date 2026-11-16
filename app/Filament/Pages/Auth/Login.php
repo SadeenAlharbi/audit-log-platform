@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -26,6 +27,7 @@ use Throwable;
  * - after a SAML sign-in, the platform's own 2FA challenge (the same form
  *   Filament shows after a password), then the session is opened;
  * - the reason a SAML sign-in was refused (no account, inactive, locked);
+ * - wrong 2FA codes count towards the account lockout, on both paths;
  * - after a correct password, why the account cannot sign in (locked or
  *   suspended) instead of the generic "credentials do not match". Only
  *   someone who knows the password learns this, so it reveals nothing.
@@ -70,7 +72,13 @@ class Login extends BaseLogin
     public function authenticate(): ?LoginResponse
     {
         if (! $this->samlChallenge) {
-            return parent::authenticate();
+            try {
+                return parent::authenticate();
+            } catch (ValidationException $exception) {
+                $this->countWrongCode($exception, $this->getUserUndertakingMultiFactorAuthentication());
+
+                throw $exception;
+            }
         }
 
         try {
@@ -90,7 +98,9 @@ class Login extends BaseLogin
 
         if ($user === null || ! $this->isUserAllowedToAccessPanel($user)) {
             $this->cancelSamlChallenge();
-            Notification::make()->title('انتهت مهلة الدخول الموحد')->body('ابدأ الدخول من جديد.')->danger()->send();
+            $this->blockedReason !== null
+                ? Notification::make()->title('تعذّر الدخول')->body($this->blockedReason)->danger()->send()
+                : Notification::make()->title('انتهت مهلة الدخول الموحد')->body('ابدأ الدخول من جديد.')->danger()->send();
 
             return null;
         }
@@ -100,7 +110,13 @@ class Login extends BaseLogin
         }
 
         $this->cacheSchema('multiFactorChallengeForm', null);
-        $this->multiFactorChallengeForm->validate();
+        try {
+            $this->multiFactorChallengeForm->validate();
+        } catch (ValidationException $exception) {
+            $this->countWrongCode($exception, $user);
+
+            throw $exception;
+        }
 
         session()->forget(HandleSamlSignIn::PENDING);
         session()->put('auth.via', 'saml');
@@ -146,6 +162,22 @@ class Login extends BaseLogin
         }
 
         return $actions;
+    }
+
+    /**
+     * A wrong 2FA code counts like a wrong password towards the lockout
+     * (plan §13): someone who has the password, or a SAML session, cannot
+     * keep guessing codes. Wrong passwords are already counted by Filament's
+     * own Failed event.
+     */
+    private function countWrongCode(ValidationException $exception, mixed $user): void
+    {
+        $codeFailed = collect(array_keys($exception->errors()))
+            ->contains(fn (string $key): bool => str_starts_with($key, 'data.multiFactor'));
+
+        if ($codeFailed && $user instanceof User) {
+            event(new Failed('web', $user, ['email' => $user->email, 'stage' => 'mfa']));
+        }
     }
 
     protected function isUserAllowedToAccessPanel(Authenticatable $user): bool

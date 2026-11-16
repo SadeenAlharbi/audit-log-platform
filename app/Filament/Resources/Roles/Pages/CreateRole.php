@@ -12,6 +12,15 @@ class CreateRole extends CreateRecord
 {
     protected static string $resource = RoleResource::class;
 
+    /** Only "add" and "cancel": no "add and start another" button. */
+    protected static bool $canCreateAnother = false;
+
+    /** Back to the list after saving. */
+    protected function getRedirectUrl(): string
+    {
+        return RoleResource::getUrl('index');
+    }
+
     protected function afterCreate(): void
     {
         $role = $this->getRecord();

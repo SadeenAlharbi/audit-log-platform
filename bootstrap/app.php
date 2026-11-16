@@ -21,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Listeners are registered explicitly in AppServiceProvider. With
+    // discovery on as well, each one ran twice (two failed-login counts per
+    // attempt, duplicated platform_audit rows).
+    ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware): void {
         // Behind a TLS-terminating load balancer set TRUSTED_PROXIES
         // (comma-separated, or "*") so HTTPS and client IPs are detected.

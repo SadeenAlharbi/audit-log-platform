@@ -13,6 +13,12 @@ class EditRole extends EditRecord
 {
     protected static string $resource = RoleResource::class;
 
+    /** Back to the list after saving. */
+    protected function getRedirectUrl(): string
+    {
+        return RoleResource::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [DeleteAction::make()];

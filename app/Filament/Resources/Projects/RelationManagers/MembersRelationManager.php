@@ -82,7 +82,9 @@ class MembersRelationManager extends RelationManager
                 Action::make('changeRole')
                     ->label('تغيير الدور')
                     ->icon(Heroicon::OutlinedPencilSquare)
-                    ->visible(fn (User $record) => $this->canManageMember($record))
+                    ->visible(fn () => $this->canManage())
+                    ->disabled(fn (User $record) => ! $this->canManageMember($record))
+                    ->tooltip(fn (User $record) => $this->whyNotManageable($record))
                     ->fillForm(fn (User $record) => ['role_id' => $record->pivot->role_id])
                     ->schema([Select::make('role_id')->label('الدور')->required()->options($grantable)])
                     ->action(function (User $record, array $data) {
@@ -101,7 +103,12 @@ class MembersRelationManager extends RelationManager
                     ->icon(Heroicon::OutlinedUserMinus)
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (User $record) => $this->canManageMember($record))
+                    ->modalHeading(fn (User $record) => 'إزالة '.$record->name.' من المشروع؟')
+                    ->modalDescription('يفقد الوصول إلى سجلات هذا المشروع ومفاتيحه فورًا. حسابه في المنصة يبقى كما هو.')
+                    ->modalSubmitActionLabel('إزالة')
+                    ->visible(fn () => $this->canManage())
+                    ->disabled(fn (User $record) => ! $this->canManageMember($record))
+                    ->tooltip(fn (User $record) => $this->whyNotManageable($record))
                     ->action(function (User $record) {
                         abort_unless($this->canManageMember($record), 403);
                         $this->project()->members()->detach($record->id);
@@ -140,6 +147,16 @@ class MembersRelationManager extends RelationManager
     private function ensureGrantable(int $roleId): void
     {
         abort_unless(in_array($roleId, $this->grantableRoleIds(), true), 403);
+    }
+
+    /** Shown on the greyed-out actions, so a manager sees why a row cannot be changed. */
+    private function whyNotManageable(User $record): ?string
+    {
+        return match (true) {
+            $this->canManageMember($record) => null,
+            $record->getKey() === auth()->id() => 'لا يمكنك تغيير عضويتك أنت؛ يغيّرها مالك آخر أو مدير المنصة.',
+            default => 'دور هذا العضو يتجاوز صلاحياتك في المشروع.',
+        };
     }
 
     /** Not one's own membership, and not a member holding a role the actor could not grant. */

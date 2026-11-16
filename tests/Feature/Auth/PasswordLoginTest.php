@@ -82,3 +82,25 @@ it('shows the profile page in sections and still needs the current password', fu
         ->call('save')
         ->assertHasFormErrors(['currentPassword']);
 });
+
+it('locks the account after five wrong 2FA codes following a correct password', function () {
+    $user = platformUser('super_admin');
+    $user->forceFill(['app_authentication_secret' => 'JBSWY3DPEHPK3PXP'])->save();
+
+    $page = passwordLogin($user->email)->assertHasNoErrors();
+    foreach (range(1, 5) as $i) {
+        // The sign-in form allows 5 submissions a minute.
+        $this->travel(61)->seconds();
+        $page->set('data.multiFactor.app.code', '000000')->call('authenticate')->assertHasErrors();
+    }
+
+    expect($user->fresh()->isLocked())->toBeTrue()
+        ->and(PlatformAudit::query()->where('action', 'auth.account_locked')->value('changes'))->toMatchArray(['stage' => 'mfa']);
+
+    // The right code no longer helps: the account is locked.
+    $this->travel(61)->seconds();
+    $page->set('data.multiFactor.app.code', app(Google2FA::class)->getCurrentOtp('JBSWY3DPEHPK3PXP'))
+        ->call('authenticate');
+    expect($page->errors()->first('data.email'))->toContain('مقفل مؤقتًا');
+    $this->assertGuest();
+});

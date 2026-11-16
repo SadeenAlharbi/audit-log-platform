@@ -58,4 +58,7 @@
     /* 2FA set-up modal: instructions, QR code and manual key centred too. */
     .fi-modal-content:has(.fi-sc-image):has(.fi-one-time-code-input-ctn) .fi-sc-text { text-align: center; }
     .fi-modal-content:has(.fi-sc-image):has(.fi-one-time-code-input-ctn) .fi-sc-flex { justify-content: center; }
+    /* Filter lists: values such as "employee.*" or "student.grade.updated"
+       keep their left-to-right order in the right-to-left page. */
+    .fi-ta-filters .fi-select-input-option, .fi-ta-filters .fi-select-input-option > span, .fi-ta-filters .fi-select-input-value-label { unicode-bidi: plaintext; text-align: right; }
 </style>

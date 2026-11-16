@@ -68,7 +68,7 @@ class LogArchiver
         $from = self::watermark();
         $settled = now()->utc()->subSeconds((int) config('audit.archive.settle_seconds', 120))->format('Y-m-d H:i:s.v');
 
-        // Nothing new: no run is recorded (an hourly no-op would otherwise
+        // Nothing new: no run is recorded (a no-op run would otherwise
         // fill the Backups page) and the watermark stays where it is.
         if (! DB::table('audit_logs')->where('id', '>', $from)->where('created_at', '<=', $settled)->exists()) {
             return ['files' => 0, 'rows' => 0, 'last_id' => $from];

@@ -143,7 +143,7 @@ dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ
 | المهمة | التوقيت (UTC) | أين |
 |---|---|---|
 | تجهيز أقسام الأشهر القادمة (`audit:partitions`) | يوميًا 01:10 | scheduler |
-| الأرشيف المتزايد Write-Ahead (`audit:archive`) | كل ساعة :05 | scheduler |
+| الأرشيف اليومي Write-Ahead (`audit:archive`، D19) | يوميًا 01:30 UTC | scheduler |
 | الاحتفاظ والحذف (`audit:prune`): أرشفة ثم حذف | يوميًا 02:30 | scheduler |
 | نسخة كاملة (mariadb-backup) | يوميًا 02:00 | backup |
 | نسخة تزايدية + نسخ Binary Logs | كل ساعة | backup |
@@ -260,7 +260,7 @@ dc exec app php artisan audit:restore-archive erp --from=2026-09-01 --to=2026-09
 2. أعد إنشاء المشاريع بنفس الـ slug.
 3. شغّل `audit:restore-archive <slug> --from=<أقدم تاريخ> --to=<الآن>` لكل مشروع.
 
-الأرشيف متأخر عن القاعدة بساعة على الأكثر (الأرشفة كل ساعة).
+الأرشيف متأخر عن القاعدة بيوم على الأكثر (الأرشفة يومية، D19). للأحدث من ذلك: الاستعادة من النسخ الاحتياطي (§3.1 أو §3.2).
 
 ### 3.5 اختبار الاستعادة
 

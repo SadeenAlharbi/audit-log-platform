@@ -42,16 +42,16 @@ class BackupStatus
 
     /**
      * The archiver records no run when there is nothing new, so an old
-     * last run is only late if logs older than two hours are still waiting.
+     * last run is only late if logs older than 26 hours are still waiting.
      *
      * @return array{label: string, value: string, ok: bool, last: ?Carbon}
      */
     private function archiveItem(): array
     {
-        $item = $this->item('آخر أرشفة للسجلات', 'logs_archive', now()->subHours(2));
+        $item = $this->item('آخر أرشفة للسجلات', 'logs_archive', now()->subHours(26)); // daily run (D19) + margin
         if (! $item['ok'] && ! str_contains($item['value'], '(آخر محاولة فشلت)')) {
             $pending = DB::table('audit_logs')->where('id', '>', LogArchiver::watermark())
-                ->where('created_at', '<', now()->utc()->subHours(2))->exists();
+                ->where('created_at', '<', now()->utc()->subHours(26))->exists();
             if (! $pending) {
                 $item['ok'] = true;
                 $item['value'] = $item['last'] ? $item['last']->diffForHumans().' (لا جديد بعدها)' : 'لا توجد سجلات للأرشفة';

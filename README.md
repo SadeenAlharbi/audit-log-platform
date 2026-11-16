@@ -99,7 +99,7 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 - **Immutability:** database triggers reject every `UPDATE` and `DELETE` on `audit_logs`; only the archiver account may delete, and only after the data is archived.
 - **Isolation:** every query is scoped to the projects the user or API key may access.
 - **Sensitive data:** credentials (passwords, tokens, card numbers) are removed before storage; personal data is masked on display unless the viewer has the "view sensitive data" permission.
-- **Retention:** monthly partitions; logs are archived as compressed JSONL, kept for a grace period, then deleted according to each project's retention.
+- **Retention:** monthly partitions; logs are archived daily as compressed JSONL (one file per project per day), kept for a grace period, then deleted according to each project's retention.
 - **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site and checked byte for byte, with a weekly automated restore test and a quarterly drill from the off-site copy (`make offsite-drill`).
 - **Self-audit:** sign-ins, role and key changes, exports, backups and every change of the `.env` settings (`audit:config-check`) are recorded in the immutable `platform_audit` table.
 - **Dashboard roles:** Super Admin, Platform Auditor, Security Officer, Project Owner, Project Viewer, plus custom roles. Two-factor authentication is mandatory for platform-wide roles.

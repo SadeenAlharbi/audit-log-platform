@@ -18,7 +18,8 @@ Schedule::command('audit:partitions')->dailyAt('01:10')->onOneServer()->withoutO
     ->onFailure(fn () => app(AlertNotifier::class)->send('partitions:failed', 'Partition maintenance failed', 'php artisan audit:partitions failed; check the scheduler logs.', 'critical'));
 
 // Write-ahead archive: every stored log goes to S3/MinIO as JSONL.gz.
-Schedule::command('audit:archive')->hourlyAt(5)->onOneServer()->withoutOverlapping(120);
+// Daily (decision D19): one archive file per project per day, before the nightly prune.
+Schedule::command('audit:archive')->dailyAt('01:30')->onOneServer()->withoutOverlapping(360);
 
 // Retention (D3): archive first, then drop expired partitions and delete
 // rows older than each project's retention_days.

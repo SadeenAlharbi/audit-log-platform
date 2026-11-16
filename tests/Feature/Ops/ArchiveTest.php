@@ -3,6 +3,7 @@
 use App\Models\BackupRun;
 use App\Models\Project;
 use App\Services\Archive\LogArchiver;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -56,4 +57,13 @@ it('waits for recent rows to settle', function () {
     $this->artisan('audit:archive')->assertSuccessful();
 
     expect(LogArchiver::watermark())->toBe(0);
+});
+
+it('archives once a day, before the nightly prune (decision D19)', function () {
+    $events = collect(app(Schedule::class)->events());
+    $archive = $events->first(fn ($e) => str_contains((string) $e->command, 'audit:archive'));
+    $prune = $events->first(fn ($e) => str_contains((string) $e->command, 'audit:prune'));
+
+    expect($archive->expression)->toBe('30 1 * * *')
+        ->and($prune->expression)->toBe('30 2 * * *');
 });

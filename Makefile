@@ -58,6 +58,10 @@ lint: ## Check code style with Pint
 analyse: ## Static analysis with Larastan
 	$(APP) ./vendor/bin/phpstan analyse --memory-limit=1G
 
+openapi-lint: ## Lint docs/openapi.yaml inside the Node 24 image (node:24-alpine)
+	docker build --target node-tools -t audit-log-platform/node .
+	docker run --rm audit-log-platform/node
+
 schema-dump: ## Write database/schema/schema.sql from the live database
 	./bin/schema-dump
 
@@ -67,4 +71,4 @@ doctor: ## Run every check and save the report to storage/logs/doctor.log
 backup-full: ## Take a full database backup now
 	$(COMPOSE) run --rm backup full
 
-.PHONY: help setup up down ps logs shell migrate fresh seed demo partitions test lint analyse schema-dump doctor backup-full
+.PHONY: help setup up down ps logs shell migrate fresh seed demo partitions test lint analyse openapi-lint schema-dump doctor backup-full

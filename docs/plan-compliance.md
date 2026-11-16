@@ -7,7 +7,7 @@
 | المتطلب | الحالة | الدليل |
 |---|---|---|
 | Laravel 13 + PHP 8.4 فقط | ✓ | `composer.json` (`"php": "^8.4"`، `"laravel/framework": "^13.0"`)، `Dockerfile` (`php:8.4-fpm`). الـ CI يفشل إن تغيّرت |
-| Node 24+ | ✓ | `package.json` engines، `.nvmrc`، CI (OpenAPI lint) |
+| Node 24+ | ✓ | `package.json` engines، `.nvmrc`، ومرحلة `node-tools` من `node:24-alpine` في الـ `Dockerfile`. الـ CI يفشل إن تغيّرت |
 | Filament 5 | ✓ | `filament/filament ^5.0` |
 | Migrations نظيفة ونهائية | ✓ | 18 Migration، واحد لكل جدول (الأخير `saml2_tenants` للدخول الموحد، D15) |
 
@@ -16,7 +16,7 @@
 | المتطلب | الحالة | الدليل |
 |---|---|---|
 | الخدمات: app، nginx، mariadb، redis، queue-worker، scheduler، backup | ✓ | `docker-compose.yml` (التخزين الخارجي S3 في الإنتاج، ومحلي في التطوير) |
-| Dockerfile متعدد المراحل dev/prod، الإضافات pdo_mysql/redis/intl/bcmath/zip/opcache، وأصول بـ node:24-alpine | ✓ | `Dockerfile` (assets / base / dev / prod / web) |
+| Dockerfile متعدد المراحل dev/prod، الإضافات pdo_mysql/redis/intl/bcmath/zip/opcache، وأصول بـ node:24-alpine | ✓ | `Dockerfile` (base / dev / prod / web / node-tools). لا توجد أصول أمامية تحتاج بناء (Filament يشحن أصوله)، فمرحلة `node-tools` (`node:24-alpine`) تشغّل أدوات Node: فحص OpenAPI (`make openapi-lint` والـ CI)، وأي بناء أصول يُضاف لاحقًا مكانه هنا |
 | `.env.docker.example` | ✓ | فيه كل المتغيرات |
 | Volumes دائمة لـ MariaDB وRedis | ✓ | `mariadb-data` و`redis-data` |
 | Healthchecks لكل خدمة | ✓ | كل الخدمات الدائمة |
@@ -32,7 +32,7 @@
 | Trigger يرفض UPDATE/DELETE إلا لحساب الأرشفة | ✓ | `AppendOnlyTriggers`، `AppendOnlyTest`، `ArchiverAndPartitionsTest` |
 | `(project_id, external_id)` يمنع التكرار | ✓ | `ingestion_keys` (D2)، `IdempotencyTest` |
 | Seeders مرجعية idempotent | ✓ | `SeedersTest` |
-| `schema.sql` أو ERD | ✓ | `database/schema/schema.sql` + ERD في `docs/schema.md` |
+| `schema.sql` أو ERD | ✓ | `database/schema/schema.sql` + ERD كامل `docs/erd/erd.pdf` (`./bin/erd`) + ملخص في `docs/schema.md` |
 | InnoDB page compression وأعمدة JSON | ✓ | `PAGE_COMPRESSED=1` على `audit_logs` |
 
 ## §5 الربط
@@ -103,7 +103,7 @@
 | اختبارات سياسات الوصول في Filament | ✓ | `tests/Feature/Dashboard` |
 | Pint + PHPStan مستوى 6 | ✓ | بدون أخطاء |
 | CI داخل Docker | ✓ | `.github/workflows/ci.yml` |
-| تغطية 80%+ لطبقة الـ API | ✓ | `bin/coverage-api`: 95.3% (والمشروع كله 90.3%) |
+| تغطية 80%+ لطبقة الـ API | ✓ | `bin/coverage-api`: 95.3% (والمشروع كله 91.3%)، تقرير `docs/reports/coverage-2026-11-16.md` |
 
 ## §11 المراقبة
 
@@ -154,10 +154,10 @@
 | الريبو مع Docker بأمر واحد | `./bin/setup` |
 | OpenAPI + README | `docs/openapi.yaml`، `README.md`، `docs/integration-guide.md` |
 | حزمة audit-client بريبو مستقل | `audit-client/` (v1.0.0) |
-| schema.sql/ERD + Migrations نظيفة | `database/schema/schema.sql`، `docs/schema.md` |
+| schema.sql/ERD + Migrations نظيفة | `database/schema/schema.sql`، `docs/erd/erd.pdf`، `docs/schema.md` |
 | Runbook | `docs/runbook.md` |
 | مصفوفة الأدوار موثقة ومختبرة | `docs/permissions-matrix.md` + `RoleMatrixTest` |
-| تغطية 80%+ للـ API | `bin/coverage-api` (95.3%) |
+| تغطية 80%+ للـ API | `docs/reports/coverage-2026-11-16.md` (95.3%) |
 | تقرير اختبار استعادة ناجح | `docs/reports/restore-test-2026-11-11.md`، وتمرين النسخة الخارجية `docs/reports/offsite-drill-2026-11-16.md` (ناجح) |
 
 ## تحديث 2026-11-12: مراجعة مستقلة ثانية
@@ -194,3 +194,10 @@
 | إعادة محاولة الاستلام | طابور الاستلام على اتصال مستقل `redis-ingest` بمهلة 3 دقائق بدل ساعة |
 | المصادقة الثنائية | الـ QR ثابت حتى يكتمل الإعداد، وتنبيه عند اختلاف ساعة الخادم، وفحص في `bin/doctor` |
 
+## تحديث 2026-11-16: مراجعة ثالثة مقابل الخطة
+
+| الملاحظة | الإصلاح |
+|---|---|
+| §2 و§3 يطلبان صورة `node:24-alpine` في Docker، والـ `Dockerfile` لم يكن فيه مرحلة Node (كان فحص OpenAPI يعمل بـ Node على جهاز الـ CI) | مرحلة `node-tools` من `node:24-alpine`، والـ CI وأمر `make openapi-lint` يفحصان OpenAPI داخلها، وحارس الـ CI يتأكد من وجودها |
+| ERD كان ملخصًا للعلاقات فقط | ERD كامل بالأعمدة والمفاتيح `docs/erd/erd.pdf`، يُولَّد من `schema.sql` بـ `./bin/erd` |
+| دليل اختبار الواجهة قبل التسليم | `docs/acceptance-testing.md` |

@@ -5,9 +5,10 @@
 #   dev    -> base + source mounted from the host (used by docker-compose.yml)
 #   prod   -> base + code and production vendor baked in
 #   web    -> nginx with the public assets
-#
-# The dashboard is Filament (assets shipped by the package), so there is no
-# front-end build. Node 24 is used by CI for the OpenAPI lint.
+#   node-tools -> Node 24 (node:24-alpine) for the Node tooling: the OpenAPI lint
+#             (`make openapi-lint`, CI). The dashboard is Filament, whose
+#             assets ship with the package, so no front-end build is needed;
+#             if one is added later, it is built in this stage.
 #
 # The PHP and Node versions are contractual (plan §2) - do not change them.
 
@@ -74,3 +75,13 @@ USER www-data
 FROM nginx:1.27-alpine AS web
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=prod /var/www/html/public /var/www/html/public
+
+############################
+# node-tools: Node 24 tooling (plan §2 / §3: node:24-alpine)
+############################
+FROM node:24-alpine AS node-tools
+WORKDIR /app
+RUN npm install --global --no-audit --no-fund @redocly/cli@1.34.3
+COPY package.json .nvmrc ./
+COPY docs/openapi.yaml docs/openapi.yaml
+CMD ["redocly", "lint", "docs/openapi.yaml", "--extends=minimal"]

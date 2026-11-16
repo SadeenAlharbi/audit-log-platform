@@ -1,0 +1,228 @@
+erDiagram
+    audit_logs {
+        bigint id PK
+        char uid
+        bigint project_id
+        bigint api_key_id
+        bigint batch_id
+        varchar external_id
+        varchar event
+        varchar action
+        enum severity
+        varchar actor_type
+        varchar actor_id
+        varchar actor_name
+        varchar actor_ip
+        varchar user_agent
+        varchar subject_type
+        varchar subject_id
+        json old_values
+        json new_values
+        json metadata
+        json tags
+        varchar request_id
+        varchar correlation_id
+        datetime occurred_at PK
+        datetime received_at
+        datetime created_at
+    }
+    backup_runs {
+        bigint id PK
+        enum type
+        enum status
+        bigint size
+        varchar location
+        char checksum
+        json meta
+        bigint triggered_by FK
+        timestamp started_at
+        timestamp finished_at
+        text error
+        timestamp created_at
+        timestamp updated_at
+    }
+    failed_jobs {
+        bigint id PK
+        varchar uuid UK
+        text connection
+        text queue
+        longtext payload
+        longtext exception
+        timestamp failed_at
+    }
+    ingestion_batches {
+        bigint id PK
+        char uid UK
+        bigint project_id FK
+        bigint api_key_id FK
+        int count
+        int accepted_count
+        int duplicate_count
+        int rejected_count
+        enum status
+        json errors
+        timestamp processed_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    ingestion_keys {
+        bigint id PK
+        bigint project_id FK
+        varchar external_id
+        char log_uid
+        datetime occurred_at
+        datetime created_at
+    }
+    model_has_permissions {
+        bigint permission_id PK,FK
+        varchar model_type PK
+        bigint model_id PK
+    }
+    model_has_roles {
+        bigint role_id PK,FK
+        varchar model_type PK
+        bigint model_id PK
+    }
+    password_reset_tokens {
+        varchar email PK
+        varchar token
+        timestamp created_at
+    }
+    permissions {
+        bigint id PK
+        varchar name
+        varchar guard_name
+        timestamp created_at
+        timestamp updated_at
+    }
+    platform_audit {
+        bigint id PK
+        bigint user_id FK
+        varchar action
+        varchar target_type
+        varchar target_id
+        json changes
+        varchar ip
+        varchar user_agent
+        datetime created_at
+    }
+    project_api_keys {
+        bigint id PK
+        bigint project_id FK
+        varchar name
+        enum environment
+        char key_prefix
+        char key_hash UK
+        text hmac_secret
+        json scopes
+        json allowed_ips
+        timestamp last_used_at
+        varchar last_used_ip
+        timestamp expires_at
+        timestamp revoked_at
+        bigint revoked_by FK
+        bigint created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    project_user {
+        bigint project_id PK,FK
+        bigint user_id PK,FK
+        bigint role_id FK
+        bigint added_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    projects {
+        bigint id PK
+        varchar name
+        varchar slug UK
+        text description
+        tinyint is_active
+        smallint retention_days
+        bigint created_by FK
+        timestamp archived_at
+        bigint archived_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    role_has_permissions {
+        bigint permission_id PK,FK
+        bigint role_id PK,FK
+    }
+    roles {
+        bigint id PK
+        varchar name
+        varchar guard_name
+        enum scope
+        timestamp created_at
+        timestamp updated_at
+    }
+    saml2_tenants {
+        int id PK
+        uuid uuid UK
+        varchar key
+        varchar idp_entity_id
+        varchar idp_login_url
+        varchar idp_logout_url
+        text idp_x509_cert
+        varchar relay_state_url
+        varchar name_id_format
+        json metadata
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
+    }
+    security_events {
+        bigint id PK
+        bigint project_id FK
+        bigint api_key_id FK
+        varchar ip
+        varchar reason
+        json request_meta
+        datetime created_at
+    }
+    users {
+        bigint id PK
+        varchar name
+        varchar email UK
+        timestamp email_verified_at
+        varchar password
+        tinyint is_active
+        text app_authentication_secret
+        text app_authentication_recovery_codes
+        smallint failed_login_attempts
+        timestamp locked_until
+        timestamp password_changed_at
+        timestamp last_login_at
+        varchar last_login_ip
+        varchar remember_token
+        timestamp created_at
+        timestamp updated_at
+    }
+    users ||--o{ backup_runs : "triggered_by"
+    project_api_keys ||--o{ ingestion_batches : "api_key_id"
+    projects ||--o{ ingestion_batches : "project_id"
+    projects ||--o{ ingestion_keys : "project_id"
+    permissions ||--o{ model_has_permissions : "permission_id"
+    roles ||--o{ model_has_roles : "role_id"
+    users ||--o{ platform_audit : "user_id"
+    users ||--o{ project_api_keys : "created_by"
+    projects ||--o{ project_api_keys : "project_id"
+    users ||--o{ project_api_keys : "revoked_by"
+    users ||--o{ project_user : "added_by"
+    projects ||--o{ project_user : "project_id"
+    roles ||--o{ project_user : "role_id"
+    users ||--o{ project_user : "user_id"
+    users ||--o{ projects : "archived_by"
+    users ||--o{ projects : "created_by"
+    permissions ||--o{ role_has_permissions : "permission_id"
+    roles ||--o{ role_has_permissions : "role_id"
+    project_api_keys ||--o{ security_events : "api_key_id"
+    projects ||--o{ security_events : "project_id"
+    projects ||..o{ audit_logs : "project_id (no FK)"
+    project_api_keys ||..o{ audit_logs : "api_key_id (no FK)"
+    ingestion_batches ||..o{ audit_logs : "batch_id (no FK)"
+    ingestion_keys ||..|| audit_logs : "log_uid = uid"
+    users ||..o{ model_has_roles : "model_id (polymorphic)"
+    users ||..o{ model_has_permissions : "model_id (polymorphic)"

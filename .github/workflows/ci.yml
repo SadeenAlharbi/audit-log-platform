@@ -27,6 +27,7 @@ jobs:
           grep -q 'ARG PHP_VERSION=8.4' Dockerfile
           grep -q '"node": ">=24"' package.json
           test "$(cat .nvmrc)" = "24"
+          grep -q '^FROM node:24-alpine AS node-tools' Dockerfile
 
       - name: Prepare .env
         run: |
@@ -83,10 +84,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-      - run: npx --yes @redocly/cli@1.34.3 lint docs/openapi.yaml --extends=minimal
+      - name: Lint inside the Node 24 image (node:24-alpine)
+        run: |
+          docker build --target node-tools -t audit-log-platform/node:ci .
+          docker run --rm audit-log-platform/node:ci
 
   images:
     name: Production images build

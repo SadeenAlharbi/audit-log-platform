@@ -55,12 +55,13 @@ make demo        # demo data: 4 systems and one account per role (development on
 make test        # test suite (audit_testing database)
 make lint        # Pint
 make analyse     # PHPStan / Larastan level 6
+make openapi-lint # lint docs/openapi.yaml in the Node 24 image (node:24-alpine)
 make fresh       # rebuild the database from scratch
 ./bin/doctor     # full health check, report in storage/logs/doctor.log
 make sso         # SAML single sign-on with a local Keycloak (SAML2_ENABLED=true first)
 make offsite-drill # restore drill from the off-site copy with the private key
 make partitions  # audit_logs partitions
-make schema-dump # refresh database/schema/schema.sql
+make schema-dump # refresh database/schema/schema.sql, then ./bin/erd for the ERD
 ```
 
 ---
@@ -115,12 +116,13 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 | [docs/openapi.yaml](docs/openapi.yaml) | API contract (OpenAPI 3.1), served at `/docs/api` |
 | [docs/runbook.md](docs/runbook.md) | Operations: deployment, backups, full and per-project restore, key rotation, incidents |
 | [docs/permissions-matrix.md](docs/permissions-matrix.md) | Roles and permissions matrix (covered by automated tests) |
-| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) | Schema and ERD |
+| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) · [docs/erd/erd.pdf](docs/erd/erd.pdf) | Schema, ERD (regenerate with `./bin/erd`) |
 | [docs/decisions.md](docs/decisions.md) | Technical decisions and their reasons |
 | [docs/security-review.md](docs/security-review.md) | Security review |
 | [docs/plan-compliance.md](docs/plan-compliance.md) | Every requirement of the plan, where it is implemented and how it is tested |
+| [docs/acceptance-testing.md](docs/acceptance-testing.md) | Manual acceptance test of every requirement from the dashboard (and the API with curl) |
 | [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | Product overview: purpose, roles, the life of a log, screens |
-| [docs/reports/](docs/reports/) | Restore test reports |
+| [docs/reports/](docs/reports/) | Restore test, off-site drill and coverage reports |
 
 Most documents under `docs/` are written in Arabic.
 
@@ -128,8 +130,8 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 210 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
-- **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api`.
+- **Pest:** 211 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
+- **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api` (95.3% on 2026-11-16, [report](docs/reports/coverage-2026-11-16.md)).
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.
 

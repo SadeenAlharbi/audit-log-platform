@@ -1,0 +1,53 @@
+{
+  "realm": "audit",
+  "displayName": "Audit Log Hub (development IdP)",
+  "enabled": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "http://localhost:8080/saml2/6f1c2c5e-4b7a-4d2e-9a51-0c8e3f2b7d10/metadata",
+      "name": "Audit Log Hub",
+      "protocol": "saml",
+      "enabled": true,
+      "frontchannelLogout": true,
+      "baseUrl": "http://localhost:8080/admin",
+      "redirectUris": ["http://localhost:8080/saml2/6f1c2c5e-4b7a-4d2e-9a51-0c8e3f2b7d10/*"],
+      "attributes": {
+        "saml_assertion_consumer_url_post": "http://localhost:8080/saml2/6f1c2c5e-4b7a-4d2e-9a51-0c8e3f2b7d10/acs",
+        "saml_single_logout_service_url_redirect": "http://localhost:8080/saml2/6f1c2c5e-4b7a-4d2e-9a51-0c8e3f2b7d10/sls",
+        "saml.authnstatement": "true",
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.client.signature": "false",
+        "saml.encrypt": "false",
+        "saml.force.name.id.format": "true",
+        "saml_name_id_format": "email",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "attribute.name": "email",
+            "attribute.nameformat": "Basic",
+            "friendly.name": "email"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    { "username": "admin", "email": "admin@demo.test", "firstName": "Platform", "lastName": "Admin", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] },
+    { "username": "auditor", "email": "auditor@demo.test", "firstName": "Platform", "lastName": "Auditor", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] },
+    { "username": "security", "email": "security@demo.test", "firstName": "Security", "lastName": "Officer", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] },
+    { "username": "owner", "email": "owner@demo.test", "firstName": "Project", "lastName": "Owner", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] },
+    { "username": "viewer", "email": "viewer@demo.test", "firstName": "Project", "lastName": "Viewer", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] },
+    { "username": "outsider", "email": "outsider@demo.test", "firstName": "No", "lastName": "Account", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "Demo-SSO-2026!", "temporary": false }] }
+  ]
+}

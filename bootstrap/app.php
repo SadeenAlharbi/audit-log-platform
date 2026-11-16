@@ -31,6 +31,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // local / tests by Laravel's TrustHosts).
         $middleware->trustHosts(at: fn () => ['^'.preg_quote((string) parse_url((string) config('app.url'), PHP_URL_HOST)).'$'], subdomains: false);
 
+        // The identity provider POSTs the SAML response from its own site;
+        // the response itself is signed and checked by the toolkit.
+        $middleware->validateCsrfTokens(except: ['saml2/*/acs', 'saml2/*/sls']);
+
         $middleware->alias([
             'api.json' => ForceJson::class,
             'api.https' => RequireHttps::class,

@@ -42,6 +42,7 @@ After that, `docker compose up -d` is all you need.
 | `queue-worker` | Horizon: stores received logs |
 | `scheduler` | Scheduled tasks: partitions, archiving, retention, backups, alerts |
 | `backup` | Daily full and hourly incremental mariadb-backup, binary logs, age encryption, rclone upload (production), weekly restore test |
+| `keycloak` | Development SAML identity provider, only with `make sso` (profile `sso`) |
 
 > In development the archive and backups stay local (`storage/app/archive`, `storage/app/backups` and the `backups` volume). In production they go to off-server S3 (runbook §1).
 
@@ -56,6 +57,7 @@ make lint        # Pint
 make analyse     # PHPStan / Larastan level 6
 make fresh       # rebuild the database from scratch
 ./bin/doctor     # full health check, report in storage/logs/doctor.log
+make sso         # SAML single sign-on with a local Keycloak (SAML2_ENABLED=true first)
 make partitions  # audit_logs partitions
 make schema-dump # refresh database/schema/schema.sql
 ```
@@ -99,6 +101,7 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 - **Retention:** monthly partitions; logs are archived as compressed JSONL, kept for a grace period, then deleted according to each project's retention.
 - **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site, with a weekly automated restore test.
 - **Dashboard roles:** Super Admin, Platform Auditor, Security Officer, Project Owner, Project Viewer, plus custom roles. Two-factor authentication is mandatory for platform-wide roles.
+- **Single sign-on (optional):** SAML 2.0 next to e-mail and password (`scaler-tech/laravel-saml2`). Only existing, active accounts can sign in, matched by e-mail, and the platform's 2FA is always asked after SAML. Setup: [docs/runbook.md §1.6](docs/runbook.md); locally, `make demo` then `make sso` starts Keycloak with demo users.
 
 ---
 

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Responses\ApiError;
 use App\Listeners\AlertOnQueueBusy;
+use App\Listeners\HandleSamlSignIn;
 use App\Listeners\RecordPermissionChanges;
 use App\Listeners\TrackDashboardLogins;
 use App\Models\Project;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Slides\Saml2\Events\SignedIn;
 use Spatie\Permission\Events\PermissionAttachedEvent;
 use Spatie\Permission\Events\PermissionDetachedEvent;
 use Spatie\Permission\Events\RoleAttachedEvent;
@@ -106,6 +108,7 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen([RoleAttachedEvent::class, RoleDetachedEvent::class, PermissionAttachedEvent::class, PermissionDetachedEvent::class], RecordPermissionChanges::class);
         Event::listen([Login::class, Logout::class, Failed::class], TrackDashboardLogins::class);
+        Event::listen(SignedIn::class, HandleSamlSignIn::class);
 
         Event::listen(QueueBusy::class, AlertOnQueueBusy::class);
 

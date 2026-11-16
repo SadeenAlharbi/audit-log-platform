@@ -49,6 +49,7 @@ erDiagram
 | **`audit_logs`** | السجلات | مقسَّم شهريًا، بدون FK، append-only. التفاصيل أدناه |
 | `security_events` | محاولات الوصول المرفوضة | `project_id` و`api_key_id` قد تكون فارغة إن لم يُعرف المفتاح |
 | `platform_audit` | تدقيق المنصة لنفسها | غير قابل للتعديل أو الحذف إطلاقًا |
+| `saml2_tenants` | مزوّد الهوية للدخول الموحد SAML (D15) | صف واحد يكتبه `audit:saml-sync` من `.env` |
 | `backup_runs` | سجل النسخ والأرشفة والاستعادة | الأنواع: full, incremental, binlog, logs_archive, app_files, restore_test, restore |
 
 ## تفصيل `audit_logs`

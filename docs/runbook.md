@@ -96,6 +96,44 @@ dc exec app php artisan horizon:terminate
 
 **قبل كل تحديث:** `dc run --rm backup full`.
 
+### 1.6 الدخول الموحد SAML (اختياري، D15)
+
+يضيف زر «الدخول عبر SAML» في صفحة الدخول بجانب كلمة المرور. يدخل فقط من له حساب نشط في المنصة بنفس البريد، والمصادقة الثنائية للمنصة تُطلب بعده دائمًا.
+
+**١. عند مزوّد الهوية (Azure AD / Keycloak / ADFS / غيره)** أنشئ تطبيق SAML بهذه القيم:
+
+| الإعداد | القيمة |
+|---|---|
+| Entity ID / Identifier | `APP_URL/saml2/<SAML2_TENANT_UUID>/metadata` |
+| ACS / Reply URL (HTTP-POST) | `APP_URL/saml2/<SAML2_TENANT_UUID>/acs` |
+| Logout URL | `APP_URL/saml2/<SAML2_TENANT_UUID>/sls` |
+| NameID | بريد المستخدم (emailAddress)، أو خاصية باسم `email` |
+| التوقيع | توقيع الـ Assertion إلزامي (RSA-SHA256) |
+
+ويمكن إعطاؤه ملف الـ metadata مباشرة من `APP_URL/saml2/<SAML2_TENANT_UUID>/metadata`.
+
+**٢. في `.env`:**
+
+```dotenv
+SAML2_ENABLED=true
+SAML2_TENANT_UUID=<UUID ثابت، لا يتغير بعد الإعداد>
+SAML2_IDP_METADATA_URL=https://idp.company.sa/.../metadata   # أو القيم الصريحة SAML2_IDP_*
+SAML2_BUTTON_LABEL=الدخول بحساب الجهة
+```
+
+**٣. التطبيق:**
+
+```bash
+dc up -d                                   # يعيد إنشاء الحاويات بالإعداد الجديد
+dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ المزوّد، ويطبع روابط الـ SP
+```
+
+أعد تشغيل `audit:saml-sync` عند تغيّر شهادة المزوّد. كل تشغيل يُسجَّل في `platform_audit` (`sso.configured`).
+
+**التطوير:** `SAML2_ENABLED=true` في `.env`، ثم `make demo` و`make sso`. يشغّل Keycloak على http://localhost:8180 (المدير admin / admin) بمستخدمين `admin@demo.test` وغيرهم بكلمة مرور `Demo-SSO-2026!`، و`outsider@demo.test` لتجربة رفض من لا حساب له.
+
+**إيقاف SAML:** `SAML2_ENABLED=false` ثم `dc up -d`. الدخول بكلمة المرور يبقى كما هو.
+
 ---
 
 ## 2. ما يعمل تلقائيًا

@@ -465,6 +465,27 @@ CREATE TABLE `roles` (
   UNIQUE KEY `roles_name_guard_name_unique` (`name`,`guard_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `saml2_tenants`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `saml2_tenants` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` uuid NOT NULL,
+  `key` varchar(255) DEFAULT NULL,
+  `idp_entity_id` varchar(255) NOT NULL,
+  `idp_login_url` varchar(255) NOT NULL,
+  `idp_logout_url` varchar(255) NOT NULL,
+  `idp_x509_cert` text NOT NULL,
+  `relay_state_url` varchar(255) DEFAULT NULL,
+  `name_id_format` varchar(255) NOT NULL DEFAULT 'persistent',
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`metadata`)),
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `saml2_tenants_uuid_unique` (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `security_events`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;

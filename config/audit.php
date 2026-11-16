@@ -173,6 +173,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | SAML single sign-on for the dashboard (decision D15)
+    |--------------------------------------------------------------------------
+    | Alongside e-mail and password. Only existing, active accounts may sign
+    | in (matched by e-mail), and the platform's own 2FA is always asked
+    | after SAML. `php artisan audit:saml-sync` writes the identity provider
+    | below to the saml2_tenants table (toolkit settings: config/saml2.php).
+    */
+    'saml' => [
+        'enabled' => (bool) env('SAML2_ENABLED', false),
+        // Fixed, so the IdP can be set up with stable SP URLs:
+        // /saml2/{uuid}/metadata (entity id), /saml2/{uuid}/acs, /saml2/{uuid}/sls
+        'tenant_uuid' => env('SAML2_TENANT_UUID'),
+        // Button label on the login page (e.g. the company's IdP name).
+        'button_label' => env('SAML2_BUTTON_LABEL') ?: 'الدخول عبر SAML',
+        // With a metadata URL, the entity id, login/logout URLs and signing
+        // certificate are read from it; any value set below overrides it.
+        'idp' => [
+            'metadata_url' => env('SAML2_IDP_METADATA_URL'),
+            'entity_id' => env('SAML2_IDP_ENTITY_ID'),
+            'login_url' => env('SAML2_IDP_LOGIN_URL'),
+            'logout_url' => env('SAML2_IDP_LOGOUT_URL'),
+            'x509_cert' => env('SAML2_IDP_X509_CERT'),
+        ],
+        // The SAML attribute holding the e-mail; the NameID is used if absent.
+        'email_attribute' => env('SAML2_EMAIL_ATTRIBUTE', 'email'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Alerts (plan §11): e-mail and/or Slack incoming webhook.
     |--------------------------------------------------------------------------
     */

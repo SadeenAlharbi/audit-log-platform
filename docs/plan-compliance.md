@@ -9,7 +9,7 @@
 | Laravel 13 + PHP 8.4 فقط | ✓ | `composer.json` (`"php": "^8.4"`، `"laravel/framework": "^13.0"`)، `Dockerfile` (`php:8.4-fpm`). الـ CI يفشل إن تغيّرت |
 | Node 24+ | ✓ | `package.json` engines، `.nvmrc`، CI (OpenAPI lint) |
 | Filament 5 | ✓ | `filament/filament ^5.0` |
-| Migrations نظيفة ونهائية | ✓ | 17 Migration، واحد لكل جدول، ولم يتغير أي منها منذ تجميد المخطط |
+| Migrations نظيفة ونهائية | ✓ | 18 Migration، واحد لكل جدول (الأخير `saml2_tenants` للدخول الموحد، D15) |
 
 ## §3 Docker
 
@@ -141,7 +141,7 @@
 | scopes للمفاتيح ومنع الجمع إلا بقرار صريح | ✓ | `FilamentPagesTest` |
 | منع التعديل في الـ Policy والـ Trigger | ✓ | `RoleMatrixTest`، `AppendOnlyTest` |
 | 2FA إلزامي لـ Super Admin وSecurity Officer | ✓ | `FilamentPagesTest` |
-| SSO (SAML/OIDC) «إن وُجد» | ◐ | غير مفعّل: لم يُحدَّد مزوّد هوية بعد (D15). يُضاف دون تغيير الصلاحيات أو المخطط |
+| SSO (SAML/OIDC) «إن وُجد» | ✓ | SAML 2.0 بجانب كلمة المرور (D15)، مع المصادقة الثنائية بعده، وKeycloak للتطوير. `SamlTest` يرسل ردودًا موقّعة حقيقية |
 | انتهاء الجلسة، قفل الحساب، كلمات مرور قوية، تدوير المفاتيح كل 90 يومًا | ✓ | `SESSION_LIFETIME=30`، `SecurityOpsTest` |
 | Self-Audit في platform_audit | ✓ | `PlatformAuditObserver`، `RecordPermissionChanges` |
 | تقرير دوري بالصلاحيات الحساسة + Access Review كل 3 أشهر | ✓ | `access:review` |

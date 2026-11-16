@@ -115,6 +115,7 @@ final class Labels
         'backup.cleaned' => 'تنظيف النسخ القديمة',
         'backup.project_restore_requested' => 'طلب استعادة مشروع',
         'backup.restore_recorded' => 'تسجيل استعادة',
+        'sso.configured' => 'إعداد الدخول الموحد (SAML)',
     ];
 
     /** @var array<string, string> */

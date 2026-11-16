@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Support\InitialsAvatarProvider;
 use App\Filament\Support\PlatformsCode;
 use App\Filament\Widgets\ActiveProjectsTable;
@@ -38,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->brandName(config('app.name', 'Audit Log Hub'))
             ->defaultAvatarProvider(InitialsAvatarProvider::class)
-            ->login()
+            ->login(Login::class)
             ->profile(isSimple: false)
             ->passwordReset()
             // Plan §13: TOTP 2FA. Enforced for privileged roles by

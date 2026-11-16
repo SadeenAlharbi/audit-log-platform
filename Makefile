@@ -35,6 +35,12 @@ seed: ## Run the (idempotent) seeders
 demo: ## Demo data for reviewers: 4 systems, ~800 logs, one account per role (dev only)
 	$(APP) php artisan db:seed --class=DemoSeeder --force
 
+sso: ## SAML single sign-on with the development Keycloak (set SAML2_ENABLED=true in .env first)
+	@grep -q '^SAML2_ENABLED=true' .env || { echo "Set SAML2_ENABLED=true in .env first"; exit 1; }
+	$(COMPOSE) --profile sso up -d
+	@echo "Waiting for Keycloak (the first start takes about a minute)..."
+	@for i in $$(seq 1 60); do $(APP) php artisan audit:saml-sync >/tmp/saml-sync.log 2>&1 && { cat /tmp/saml-sync.log; exit 0; }; sleep 3; done; cat /tmp/saml-sync.log; exit 1
+
 partitions: ## List audit_logs partitions and add upcoming months
 	$(APP) php artisan audit:partitions
 

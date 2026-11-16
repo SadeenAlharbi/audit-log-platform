@@ -19,6 +19,7 @@
         "laravel/horizon": "^5.50",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.35",
+        "scaler-tech/laravel-saml2": "^2.7",
         "spatie/laravel-permission": "^8.3"
     },
     "require-dev": {

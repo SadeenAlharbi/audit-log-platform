@@ -165,6 +165,32 @@ services:
       mariadb:
         condition: service_healthy
 
+  # Development identity provider for SAML single sign-on (decision D15).
+  # Not started by default: `make sso` (profile "sso"). Admin console:
+  # http://localhost:8180 (admin / admin), realm "audit", demo users
+  # *@demo.test with password Demo-SSO-2026!. Development only.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    profiles: ["sso"]
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./docker/keycloak/realm-audit.json:/opt/keycloak/data/import/realm-audit.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
 volumes:
   mariadb-data:
   redis-data:

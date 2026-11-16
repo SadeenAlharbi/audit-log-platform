@@ -7,7 +7,7 @@
             <x-filament::icon icon="heroicon-o-beaker" class="alh-demo-icon" />
             حسابات تجريبية
         </span>
-        <span class="alh-demo-hint">انقر للدخول بالحساب</span>
+        <span class="alh-demo-hint">انقر لتسجيل دخول مباشر</span>
     </div>
 
     <div class="alh-demo-list">
@@ -25,7 +25,7 @@
         @endforeach
     </div>
 
-    <p class="alh-demo-note">بيئة التطوير فقط. المصادقة الثنائية تُطلب كالمعتاد.</p>
+    <p class="alh-demo-note">للتجربة في بيئة التطوير فقط: دخول مباشر بلا كلمة مرور ولا مصادقة ثنائية.</p>
 </div>
 
 <style>

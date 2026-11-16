@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DemoLogins;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
@@ -123,6 +124,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function requiresMultiFactorAuthentication(): bool
     {
+        // Demo list on a local/review copy: no 2FA (DemoLogins).
+        if (DemoLogins::isDemoSession()) {
+            return false;
+        }
+
         return $this->hasAnyRole(config('audit.accounts.mfa_required_roles', []))
             || $this->roles->contains(fn ($role) => ($role->scope ?? 'platform') === 'platform')
             || $this->projectIdsWith('logs.view_sensitive') !== []

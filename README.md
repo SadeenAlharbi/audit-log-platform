@@ -51,7 +51,7 @@ After that, `docker compose up -d` is all you need.
 ```bash
 make help        # all commands
 make ps          # service status and health checks
-make demo        # demo data: 4 systems, one account per role, listed under the sign-in form (local only)
+make demo        # demo data: 4 systems, one account per role; one-click sign-in list on the login page (local only, no 2FA)
 make test        # test suite (audit_testing database)
 make lint        # Pint
 make analyse     # PHPStan / Larastan level 6
@@ -130,7 +130,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 221 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
+- **Pest:** 222 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
 - **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api` (95.3% on 2026-11-16, [report](docs/reports/coverage-2026-11-16.md)).
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.

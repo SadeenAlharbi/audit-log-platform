@@ -87,7 +87,7 @@ class TrackDashboardLogins
             'last_login_ip' => request()->ip(),
         ])->saveQuietly();
 
-        $via = request()->hasSession() ? request()->session()->get('auth.via', 'password') : 'password';
+        $via = app()->bound('session') ? (string) session('auth.via', 'password') : 'password';
         $this->audit->record('auth.login', $user, ['method' => $via], $user);
     }
 }

@@ -18,9 +18,10 @@ return [
     // Password of the *@demo.test accounts created by `make demo` (dev only).
     'demo_password' => env('DEMO_PASSWORD', 'Demo!Passw0rd#2026'),
 
-    // The "demo accounts" list under the sign-in form (one click signs in as
-    // that account; 2FA still applies). Only ever shown when APP_ENV is local
-    // or review and the accounts exist (`make demo`); never in production.
+    // The "demo accounts" list under the sign-in form: one click signs in as
+    // that account without password or 2FA (App\Support\DemoLogins). Only
+    // when APP_ENV is local (on a local host) or review and the accounts
+    // exist (`make demo`); never in production.
     'demo_logins' => (bool) env('AUDIT_DEMO_LOGINS', true),
 
     'retention' => [

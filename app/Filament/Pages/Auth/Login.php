@@ -4,8 +4,8 @@ namespace App\Filament\Pages\Auth;
 
 use App\Listeners\HandleSamlSignIn;
 use App\Models\User;
+use App\Support\DemoLogins;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
-use Database\Seeders\DemoSeeder;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
@@ -30,7 +30,8 @@ use Throwable;
  *   Filament shows after a password), then the session is opened;
  * - the reason a SAML sign-in was refused (no account, inactive, locked);
  * - wrong 2FA codes count towards the account lockout, on both paths;
- * - in local/review environments, a "demo accounts" list under the form;
+ * - in local/review environments, a "demo accounts" list under the form
+ *   (one click, no password or 2FA; see DemoLogins);
  * - after a correct password, why the account cannot sign in (locked or
  *   suspended) instead of the generic "credentials do not match". Only
  *   someone who knows the password learns this, so it reveals nothing.
@@ -155,41 +156,35 @@ class Login extends BaseLogin
         ]);
     }
 
-    /**
-     * Demo accounts that exist, for the list under the form. Empty (so the
-     * list is hidden) outside local/review, when turned off, or before
-     * `make demo`.
-     *
-     * @return array<string, string> e-mail => role
-     */
+    /** @return array<string, string> e-mail => role (empty: the list is hidden) */
     public function demoAccounts(): array
     {
-        if (! app()->environment(['local', 'review']) || ! config('audit.demo_logins')) {
-            return [];
-        }
-
-        $accounts = array_column(DemoSeeder::ACCOUNTS, 1, 0);
-        $existing = User::query()->whereIn('email', array_keys($accounts))->pluck('email')->all();
-
-        return array_intersect_key($accounts, array_flip($existing));
+        return DemoLogins::accounts();
     }
 
     /**
-     * One click on the demo list: the normal sign-in with that account and
-     * the demo password, filled in on the server. Lockout and 2FA apply as
-     * for any sign-in.
+     * One click on the demo list (local/review only, see DemoLogins): signs
+     * in as that account without password or 2FA, so the roles can be tried
+     * quickly. A locked or suspended account is still refused, and the
+     * sign-in is recorded in platform_audit with "via: demo".
      */
     public function loginAsDemo(string $email): ?LoginResponse
     {
         abort_unless(array_key_exists($email, $this->demoAccounts()), 404);
 
-        $this->form->fill([
-            'email' => $email,
-            'password' => (string) config('audit.demo_password', DemoSeeder::PASSWORD),
-            'remember' => false,
-        ]);
+        $user = User::query()->where('email', $email)->firstOrFail();
 
-        return $this->authenticate();
+        if (! $this->isUserAllowedToAccessPanel($user)) {
+            Notification::make()->title('تعذّر الدخول')->body((string) $this->blockedReason)->danger()->send();
+
+            return null;
+        }
+
+        session()->put('auth.via', DemoLogins::VIA);
+        Filament::auth()->login($user);
+        session()->regenerate();
+
+        return app(LoginResponse::class);
     }
 
     /** @return array<int, Action> */

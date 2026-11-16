@@ -108,7 +108,7 @@ it('locks the account after five wrong 2FA codes following a correct password', 
 
 it('offers the demo accounts under the form only in local/review, and signs in with one click', function () {
     $owner = projectUser(Project::factory()->create(), 'project_owner');
-    $owner->forceFill(['email' => 'owner@demo.test', 'password' => config('audit.demo_password')])->save();
+    $owner->forceFill(['email' => 'owner@demo.test'])->save();
 
     // Testing / production: no list, and the action is refused.
     Livewire::test(Login::class)->assertDontSee('حسابات تجريبية');
@@ -122,7 +122,8 @@ it('offers the demo accounts under the form only in local/review, and signs in w
         ->assertSee('owner@demo.test')
         ->assertDontSee('admin@demo.test') // not created: not listed
         ->call('loginAsDemo', 'owner@demo.test');
-    expect(Filament::auth()->id())->toBe($owner->id);
+    expect(Filament::auth()->id())->toBe($owner->id)
+        ->and(PlatformAudit::query()->where('action', 'auth.login')->latest('id')->value('changes'))->toMatchArray(['method' => 'demo']);
 
     // Only the listed demo accounts.
     Filament::auth()->logout();
@@ -130,4 +131,33 @@ it('offers the demo accounts under the form only in local/review, and signs in w
 
     config(['audit.demo_logins' => false]);
     Livewire::test(Login::class)->assertDontSee('حسابات تجريبية');
+});
+
+it('skips 2FA for a demo-list sign-in only, and keeps it for the password', function () {
+    app()->detectEnvironment(fn () => 'local');
+    $admin = platformUser('super_admin');
+    $admin->forceFill(['email' => 'admin@demo.test', 'app_authentication_secret' => 'JBSWY3DPEHPK3PXP'])->save();
+
+    // The password still leads to the 2FA code.
+    $page = passwordLogin('admin@demo.test')->assertHasNoErrors();
+    $this->assertGuest();
+    expect($page->get('userUndertakingMultiFactorAuthentication'))->toBeString();
+
+    // The demo list signs in directly, and the dashboard opens without 2FA.
+    Livewire::test(Login::class)->call('loginAsDemo', 'admin@demo.test');
+    expect(Filament::auth()->id())->toBe($admin->id)
+        ->and($admin->fresh()->requiresMultiFactorAuthentication())->toBeFalse();
+    $this->get('/admin')->assertOk();
+
+    // A locked demo account is still refused.
+    Filament::auth()->logout();
+    session()->forget('auth.via');
+    $admin->forceFill(['locked_until' => now()->addMinutes(15)])->save();
+    Livewire::test(Login::class)->call('loginAsDemo', 'admin@demo.test')->assertNotified('تعذّر الدخول');
+    $this->assertGuest();
+
+    // Outside local/review the demo session flag means nothing.
+    session()->put('auth.via', 'demo');
+    app()->detectEnvironment(fn () => 'production');
+    expect($admin->fresh()->requiresMultiFactorAuthentication())->toBeTrue();
 });

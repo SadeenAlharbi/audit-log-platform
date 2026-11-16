@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """Generate the ERD from database/schema/schema.sql.
 
-Writes docs/erd/erd.mmd (Mermaid source). With the Mermaid CLI (mmdc) on the
-PATH it also renders docs/erd/erd.svg and docs/erd/erd.pdf.
-
     ./bin/erd            # after `make schema-dump`
 
-Solid lines are foreign keys. Dotted lines are logical references without a
+Writes, in docs/erd/:
+  erd.dot  Graphviz source: tables grouped by area, a line from each foreign
+           key column to the key it references.
+  erd.mmd  Mermaid source (GitHub renders it in Markdown).
+  erd.svg / erd.pdf / erd.png when Graphviz (`dot`) is installed.
+
+Solid lines are foreign keys. Dashed lines are logical references without a
 foreign key: audit_logs is partitioned, and MariaDB does not allow foreign
 keys on partitioned tables (decision D1); spatie's model_has_* tables are
-polymorphic.
+polymorphic. The "who did it" references to users (created_by, revoked_by,
+...) are written in the row ("→ users.id") instead of drawn, so the main
+relations stand out.
 """
 
+import html
 import pathlib
 import re
 import shutil
@@ -24,15 +30,32 @@ OUT = ROOT / "docs/erd"
 
 SKIP = {"migrations"}
 
-# Logical references (no FK): (parent, child, label, one-to-one?)
-LOGICAL = [
-    ("projects", "audit_logs", "project_id (no FK)", False),
-    ("project_api_keys", "audit_logs", "api_key_id (no FK)", False),
-    ("ingestion_batches", "audit_logs", "batch_id (no FK)", False),
-    ("ingestion_keys", "audit_logs", "log_uid = uid", True),
-    ("users", "model_has_roles", "model_id (polymorphic)", False),
-    ("users", "model_has_permissions", "model_id (polymorphic)", False),
+# Areas, in reading order, with their colours (header, fill).
+GROUPS = [
+    ("ingest", "Logs and ingestion  ·  السجلات والاستلام", "#166534", "#f0fdf4",
+     ["projects", "project_api_keys", "ingestion_batches", "ingestion_keys", "audit_logs"]),
+    ("access", "Users and permissions  ·  المستخدمون والصلاحيات", "#1e40af", "#eff6ff",
+     ["users", "project_user", "roles", "permissions", "role_has_permissions", "model_has_roles", "model_has_permissions"]),
+    ("security", "Security and self-audit  ·  الأمان وتدقيق المنصة", "#9a3412", "#fff7ed",
+     ["security_events", "platform_audit"]),
+    ("ops", "Operations  ·  التشغيل", "#4b5563", "#f9fafb",
+     ["backup_runs", "saml2_tenants", "password_reset_tokens", "failed_jobs"]),
 ]
+
+# Logical references without a foreign key: (child, column, parent, parent column)
+LOGICAL = [
+    ("audit_logs", "project_id", "projects", "id"),
+    ("audit_logs", "api_key_id", "project_api_keys", "id"),
+    ("audit_logs", "batch_id", "ingestion_batches", "id"),
+    ("ingestion_keys", "log_uid", "audit_logs", "uid"),
+    ("model_has_roles", "model_id", "users", "id"),
+    ("model_has_permissions", "model_id", "users", "id"),
+]
+
+# Foreign keys to users that record who did something: drawn in grey.
+ACTOR_COLUMNS = {"created_by", "revoked_by", "archived_by", "added_by", "triggered_by"}
+
+FONT = "IBM Plex Sans Arabic,DejaVu Sans,sans-serif"
 
 
 def parse(sql: str):
@@ -48,14 +71,15 @@ def parse(sql: str):
         pk = re.search(r"PRIMARY KEY \(([^)]*)\)", body)
         pk_cols = re.findall(r"`(\w+)`", pk.group(1)) if pk else []
         uniques = [re.findall(r"`(\w+)`", u) for u in re.findall(r"UNIQUE KEY `\w+` \(([^)]*)\)", body)]
-        fks = re.findall(r"FOREIGN KEY \(`(\w+)`\) REFERENCES `(\w+)`", body)
-        fk_cols = {c for c, _ in fks}
+        fks = re.findall(r"FOREIGN KEY \(`(\w+)`\) REFERENCES `(\w+)` \(`(\w+)`\)", body)
+        fk_cols = {c for c, _, _ in fks}
+        unique_cols = {c for u in uniques for c in u}
         for c in cols:
             if c[0] in pk_cols:
                 c[2].add("PK")
             if c[0] in fk_cols:
                 c[2].add("FK")
-            if any(u == [c[0]] for u in uniques):
+            if c[0] in unique_cols and c[0] not in pk_cols:
                 c[2].add("UK")
         tables[name] = {"cols": cols, "fks": fks}
     return tables
@@ -71,33 +95,113 @@ def mermaid(tables) -> str:
         lines.append("    }")
     seen = set()
     for child, t in tables.items():
-        for col, parent in t["fks"]:
-            if (parent, child, col) in seen:
-                continue
-            seen.add((parent, child, col))
-            lines.append(f'    {parent} ||--o{{ {child} : "{col}"')
-    for parent, child, label, one in LOGICAL:
+        for col, parent, _ in t["fks"]:
+            if (parent, child, col) not in seen:
+                seen.add((parent, child, col))
+                lines.append(f'    {parent} ||--o{{ {child} : "{col}"')
+    for child, col, parent, _ in LOGICAL:
         if parent in tables and child in tables:
-            lines.append(f'    {parent} ||..{"||" if one else "o{"} {child} : "{label}"')
+            one = col == "log_uid"
+            lines.append(f'    {parent} ||..{"||" if one else "o{"} {child} : "{col} (no FK)"')
     return "\n".join(lines) + "\n"
+
+
+def node(name, t, header, fill, notes=None) -> str:
+    notes = notes or {}
+    badge = {"PK": ("PK", "#b45309"), "FK": ("FK", "#1d4ed8"), "UK": ("UK", "#6b7280")}
+    rows = [
+        f'<TR><TD COLSPAN="3" BGCOLOR="{header}" ALIGN="LEFT" CELLPADDING="7">'
+        f'<FONT COLOR="white" POINT-SIZE="13"><B>{html.escape(name)}</B></FONT></TD></TR>'
+    ]
+    for col, ctype, keys in t["cols"]:
+        k = next((badge[x] for x in ("PK", "FK", "UK") if x in keys), None)
+        key_cell = f'<FONT COLOR="{k[1]}" POINT-SIZE="9"><B>{k[0]}</B></FONT>' if k else ""
+        name_cell = f"<B>{html.escape(col)}</B>" if "PK" in keys else html.escape(col)
+        rows.append(
+            f'<TR><TD ALIGN="CENTER" WIDTH="26" PORT="{col}_in">{key_cell}</TD>'
+            f'<TD ALIGN="LEFT">{name_cell}</TD>'
+            f'<TD ALIGN="LEFT" PORT="{col}_out"><FONT COLOR="#6b7280" POINT-SIZE="9">{html.escape(ctype)}</FONT>'
+            + (f'<FONT COLOR="#9ca3af" POINT-SIZE="8">  → {html.escape(notes[col])}</FONT>' if col in notes else "")
+            + "</TD></TR>"
+        )
+    table = (
+        f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" COLOR="{header}" BGCOLOR="white">'
+        + "".join(rows) + "</TABLE>"
+    )
+    return f'    "{name}" [label=<{table}>];'
+
+
+def actor_notes(t) -> dict:
+    """Who-did-it references to users are written in the row, not drawn."""
+    return {col: f"{parent}.{pcol}" for col, parent, pcol in t["fks"] if parent == "users" and col in ACTOR_COLUMNS}
+
+
+def graphviz(tables) -> str:
+    out = [
+        "digraph ERD {",
+        '    graph [rankdir=LR, splines=spline, nodesep=0.35, ranksep=0.9, newrank=true, pad=0.4, bgcolor="white",',
+        f'           fontname="{FONT}", fontsize=22, labelloc=t, labeljust=l,',
+        '           label=<<B>Audit Log Hub — ERD</B><BR/><FONT POINT-SIZE="12" COLOR="#6b7280">'
+        "Generated from database/schema/schema.sql by bin/erd. "
+        "Solid: foreign key · Dashed: logical reference without FK (partitioned table / polymorphic) · "
+        "→ users.id: who did it (created_by, revoked_by, ...)</FONT>>];",
+        f'    node [shape=plaintext, fontname="{FONT}", fontsize=11];',
+        f'    edge [fontname="{FONT}", color="#374151", penwidth=1.3, dir=both, arrowtail=teetee, arrowhead=crowodot, arrowsize=0.8];',
+    ]
+    placed = set()
+    for gid, label, header, fill, names in GROUPS:
+        out.append(f"    subgraph cluster_{gid} {{")
+        out.append(
+            f'        label=<<B>{html.escape(label)}</B>>; fontsize=15; fontcolor="{header}"; '
+            f'style="rounded,filled"; color="{header}"; fillcolor="{fill}"; penwidth=1.5; margin=18;'
+        )
+        for name in names:
+            if name in tables:
+                out.append("    " + node(name, tables[name], header, fill, actor_notes(tables[name])))
+                placed.add(name)
+        out.append("    }")
+    for name, t in tables.items():
+        if name not in placed:
+            out.append(node(name, t, "#4b5563", "#f9fafb"))
+
+    # Parent on the left, child on the right: one (|) at the parent key,
+    # zero-or-many (crow's foot) at the child column.
+    for child, t in tables.items():
+        for col, parent, pcol in t["fks"]:
+            if parent not in tables or (parent == "users" and col in ACTOR_COLUMNS):
+                continue
+            out.append(f'    "{parent}":"{pcol}_out":e -> "{child}":"{col}_in":w;')
+    for child, col, parent, pcol in LOGICAL:
+        if parent in tables and child in tables:
+            head = "teeodot" if col == "log_uid" else "crowodot"
+            out.append(
+                f'    "{parent}":"{pcol}_out":e -> "{child}":"{col}_in":w '
+                f'[style=dashed, color="#6b7280", arrowhead={head}];'
+            )
+    # Layout only: the operations tables have no relations; keep them to the
+    # right of the security tables instead of above everything else.
+    for left, right in (("security_events", "backup_runs"), ("platform_audit", "saml2_tenants"),
+                        ("platform_audit", "password_reset_tokens"), ("platform_audit", "failed_jobs")):
+        if left in tables and right in tables:
+            out.append(f'    "{left}" -> "{right}" [style=invis];')
+    out.append("}")
+    return "\n".join(out) + "\n"
 
 
 def main() -> int:
     tables = parse(SCHEMA.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
-    src = OUT / "erd.mmd"
-    src.write_text(mermaid(tables))
-    print(f"{src.relative_to(ROOT)}: {len(tables)} tables")
+    (OUT / "erd.mmd").write_text(mermaid(tables))
+    dot_src = OUT / "erd.dot"
+    dot_src.write_text(graphviz(tables))
+    print(f"docs/erd/erd.dot, docs/erd/erd.mmd: {len(tables)} tables")
 
-    mmdc = shutil.which("mmdc")
-    if not mmdc:
-        print("mmdc not found: install @mermaid-js/mermaid-cli to render SVG/PDF")
+    dot = shutil.which("dot")
+    if not dot:
+        print("Graphviz (dot) not found: install it to render SVG/PDF/PNG")
         return 0
-    for ext in ("svg", "pdf"):
-        args = [mmdc, "-i", str(src), "-o", str(OUT / f"erd.{ext}"), "-b", "white", "-w", "2400"]
-        if ext == "pdf":
-            args.append("--pdfFit")
-        subprocess.run(args, check=True)
+    for ext, extra in (("svg", []), ("pdf", []), ("png", ["-Gdpi=110"])):
+        subprocess.run([dot, f"-T{ext}", *extra, "-o", str(OUT / f"erd.{ext}"), str(dot_src)], check=True)
         print(f"docs/erd/erd.{ext}")
     return 0
 

@@ -311,6 +311,7 @@ make offsite-drill
 | **Queue backlog / wait time too long** | Horizon متوقف أو القاعدة بطيئة | `/horizon`، ثم `dc logs queue-worker`، ثم `dc restart queue-worker` |
 | **Audit logs could not be stored** | Job فشل بعد 5 محاولات | أصلح السبب (القاعدة، أو قسم مفقود)، ثم `dc exec app php artisan queue:retry all`. السجلات محفوظة في `failed_jobs` ولا تضيع |
 | **Repeated rejected API requests** | مفتاح مسرّب، أو نظام مضبوط خطأ، أو هجوم | «المحاولات المرفوضة»: حدّد العنوان والسبب. ألغِ المفتاح، أو أضف قائمة IP، أو احجب العنوان في الـ proxy |
+| حساب مقفل (رسالة «الحساب مقفل مؤقتًا» عند الدخول) | 5 محاولات دخول خاطئة | ينفك وحده بعد 15 دقيقة، أو «المستخدمون ← فك القفل»، أو إن كان مدير المنصة الوحيد: `dc exec app php artisan audit:unlock-user <email>` |
 
 ---
 

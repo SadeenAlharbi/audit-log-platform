@@ -61,7 +61,7 @@ make fresh       # rebuild the database from scratch
 make sso         # SAML single sign-on with a local Keycloak (SAML2_ENABLED=true first)
 make offsite-drill # restore drill from the off-site copy with the private key
 make partitions  # audit_logs partitions
-make schema-dump # refresh database/schema/schema.sql, then ./bin/erd for the ERD
+make schema-dump # refresh database/schema/schema.sql, then ./bin/erd for the ERD (needs Graphviz)
 ```
 
 ---
@@ -130,7 +130,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 211 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
+- **Pest:** 217 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
 - **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api` (95.3% on 2026-11-16, [report](docs/reports/coverage-2026-11-16.md)).
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.

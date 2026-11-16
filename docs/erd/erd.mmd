@@ -67,8 +67,8 @@ erDiagram
     }
     ingestion_keys {
         bigint id PK
-        bigint project_id FK
-        varchar external_id
+        bigint project_id FK,UK
+        varchar external_id UK
         char log_uid
         datetime occurred_at
         datetime created_at
@@ -90,8 +90,8 @@ erDiagram
     }
     permissions {
         bigint id PK
-        varchar name
-        varchar guard_name
+        varchar name UK
+        varchar guard_name UK
         timestamp created_at
         timestamp updated_at
     }
@@ -152,8 +152,8 @@ erDiagram
     }
     roles {
         bigint id PK
-        varchar name
-        varchar guard_name
+        varchar name UK
+        varchar guard_name UK
         enum scope
         timestamp created_at
         timestamp updated_at
@@ -223,6 +223,6 @@ erDiagram
     projects ||..o{ audit_logs : "project_id (no FK)"
     project_api_keys ||..o{ audit_logs : "api_key_id (no FK)"
     ingestion_batches ||..o{ audit_logs : "batch_id (no FK)"
-    ingestion_keys ||..|| audit_logs : "log_uid = uid"
-    users ||..o{ model_has_roles : "model_id (polymorphic)"
-    users ||..o{ model_has_permissions : "model_id (polymorphic)"
+    audit_logs ||..|| ingestion_keys : "log_uid (no FK)"
+    users ||..o{ model_has_roles : "model_id (no FK)"
+    users ||..o{ model_has_permissions : "model_id (no FK)"

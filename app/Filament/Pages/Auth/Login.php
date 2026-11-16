@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Auth;
 
 use App\Listeners\HandleSamlSignIn;
+use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
@@ -13,6 +14,8 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -22,13 +25,19 @@ use Throwable;
  * - a "sign in with SAML" button under the password form, when enabled;
  * - after a SAML sign-in, the platform's own 2FA challenge (the same form
  *   Filament shows after a password), then the session is opened;
- * - the reason a SAML sign-in was refused (no account, inactive, locked).
+ * - the reason a SAML sign-in was refused (no account, inactive, locked);
+ * - after a correct password, why the account cannot sign in (locked or
+ *   suspended) instead of the generic "credentials do not match". Only
+ *   someone who knows the password learns this, so it reveals nothing.
  */
 class Login extends BaseLogin
 {
     /** The 2FA step was started by a SAML sign-in, not by a password. */
     #[Locked]
     public bool $samlChallenge = false;
+
+    /** Why an account with a correct password was refused (not a Livewire property). */
+    private ?string $blockedReason = null;
 
     public function mount(): void
     {
@@ -137,6 +146,32 @@ class Login extends BaseLogin
         }
 
         return $actions;
+    }
+
+    protected function isUserAllowedToAccessPanel(Authenticatable $user): bool
+    {
+        $allowed = parent::isUserAllowedToAccessPanel($user);
+
+        if (! $allowed && $user instanceof User) {
+            $this->blockedReason = match (true) {
+                $user->isLocked() => 'الحساب مقفل مؤقتًا بعد محاولات دخول خاطئة متكررة. حاول بعد '
+                    .max(1, (int) ceil(now()->diffInSeconds($user->locked_until) / 60))
+                    .' دقيقة، أو اطلب من مدير المنصة فك القفل.',
+                ! $user->is_active => 'هذا الحساب موقوف. تواصل مع مدير المنصة.',
+                default => 'هذا الحساب لا يملك أي دور أو مشروع بعد. تواصل مع مدير المنصة.',
+            };
+        }
+
+        return $allowed;
+    }
+
+    protected function throwFailureValidationException(): never
+    {
+        if ($this->blockedReason !== null) {
+            throw ValidationException::withMessages(['data.email' => $this->blockedReason]);
+        }
+
+        parent::throwFailureValidationException();
     }
 
     /** @return array{identifier: mixed, userKey: string, at: int}|null */

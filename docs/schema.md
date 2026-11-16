@@ -7,7 +7,7 @@
 
 ## مخطط العلاقات (ERD)
 
-**الرسم الكامل بالأعمدة والمفاتيح:** [`docs/erd/erd.pdf`](erd/erd.pdf) (و[`erd.svg`](erd/erd.svg))، مولَّد من `schema.sql` بالأمر `./bin/erd` بعد `make schema-dump`. فيه كل الجداول عدا `migrations`.
+**الرسم الكامل بالأعمدة والمفاتيح:** [`docs/erd/erd.pdf`](erd/erd.pdf) (و[`erd.png`](erd/erd.png) و[`erd.svg`](erd/erd.svg))، مولَّد من `schema.sql` بالأمر `./bin/erd` بعد `make schema-dump`. فيه كل الجداول عدا `migrations`.
 
 الملخص أدناه للعلاقات فقط. الخط المتقطع = علاقة منطقية **بدون** Foreign Key (بسبب التقسيم، D1).
 

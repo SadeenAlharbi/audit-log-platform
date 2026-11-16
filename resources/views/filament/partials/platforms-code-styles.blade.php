@@ -48,4 +48,14 @@
     .alh-diff-added .alh-diff-badge { background: var(--success-50); color: var(--success-700); }
     .alh-diff-removed .alh-diff-badge { background: var(--danger-50); color: var(--danger-700); }
     .alh-diff-note { font-size: .8125rem; color: var(--gray-500); margin-bottom: .5rem; }
+    /* One-time code (2FA) fields: a centred block (label, digits, help text)
+       wherever they appear: sign-in challenge, set-up and disable modals.
+       The digits stay left-to-right, as codes are read. */
+    .fi-fo-field:has(.fi-one-time-code-input-ctn) { text-align: center; }
+    .fi-fo-field:has(.fi-one-time-code-input-ctn) .fi-fo-field-label-ctn { justify-content: center; }
+    .fi-one-time-code-input-ctn { margin-inline: auto; gap: .625rem; }
+    .fi-one-time-code-input-ctn > .fi-one-time-code-input-digit { height: 3rem; width: 2.75rem; font-size: 1.25rem; }
+    /* 2FA set-up modal: instructions, QR code and manual key centred too. */
+    .fi-modal-content:has(.fi-sc-image):has(.fi-one-time-code-input-ctn) .fi-sc-text { text-align: center; }
+    .fi-modal-content:has(.fi-sc-image):has(.fi-one-time-code-input-ctn) .fi-sc-flex { justify-content: center; }
 </style>

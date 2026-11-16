@@ -44,6 +44,11 @@ mkdir -p "$BACKUP_ROOT/full" "$BACKUP_ROOT/incremental" "$BACKUP_ROOT/binlogs" "
 chown -R 33:33 "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports" 2>/dev/null || chmod 1777 "$SPOOL/status" "$SPOOL/requests" "$SPOOL/reports"
 
 log() { echo "[backup $(date -u +%FT%TZ)] $*" >&2; }
+
+# The off-site remote is defined by RCLONE_CONFIG_OFFSITE_* variables; an
+# empty config file keeps rclone from warning that none exists.
+export RCLONE_CONFIG="${RCLONE_CONFIG:-/tmp/rclone.conf}"
+[ -e "$RCLONE_CONFIG" ] || : > "$RCLONE_CONFIG"
 now_iso() { date -u +%FT%TZ; }
 stamp() { date -u +%Y%m%dT%H%M%SZ; }
 
@@ -98,9 +103,13 @@ ship() {
             log "ERROR: upload to $remote failed - the encrypted artifact is kept at $out"
             return 1
         fi
-        # Byte-for-byte verification of the off-site copy (downloads it back).
-        if ! rclone check --one-way --download "$out" "$remote" >/dev/null 2>&1; then
-            log "ERROR: off-site copy $remote does not match the local artifact - kept at $out"
+        # Byte-for-byte verification of the off-site copy: download it back
+        # and compare its SHA-256 with the local artifact's. (`rclone check`
+        # compares directories and fails on single files.)
+        local remote_sum
+        remote_sum="$(rclone cat "$remote" 2>/dev/null | sha256sum | awk '{print $1}')"
+        if [ "$remote_sum" != "$sum" ]; then
+            log "ERROR: off-site copy $remote does not match the local artifact (sha256 ${remote_sum:-unreadable}) - kept at $out"
             return 1
         fi
         location="$remote"

@@ -73,6 +73,18 @@ return [
             'after_commit' => false,
         ],
 
+        // Same Redis queues, for the ingest jobs only: a job held by a worker
+        // that crashed is handed to another one after 3 minutes instead of an
+        // hour (the job timeout is 120 s, Horizon's 150 s).
+        'redis-ingest' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'ingest',
+            'retry_after' => (int) env('REDIS_INGEST_RETRY_AFTER', 180),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

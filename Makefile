@@ -41,6 +41,11 @@ sso: ## SAML single sign-on with the development Keycloak (set SAML2_ENABLED=tru
 	@echo "Waiting for Keycloak (the first start takes about a minute)..."
 	@for i in $$(seq 1 60); do $(APP) php artisan audit:saml-sync >/tmp/saml-sync.log 2>&1 && { cat /tmp/saml-sync.log; exit 0; }; sleep 3; done; cat /tmp/saml-sync.log; exit 1
 
+offsite-drill: ## Restore drill from the OFF-SITE copy with the private key (secrets/backup-age-identity.txt)
+	$(COMPOSE) run --rm --no-deps -v "$(CURDIR)/secrets/backup-age-identity.txt:/run/age-identity.txt:ro" -e AGE_IDENTITY_FILE=/run/age-identity.txt backup offsite-drill
+	$(APP) php artisan backup:monitor
+	@ls -1t storage/app/backup-spool/reports/ | head -n1 | sed 's#^#Report: storage/app/backup-spool/reports/#'
+
 partitions: ## List audit_logs partitions and add upcoming months
 	$(APP) php artisan audit:partitions
 

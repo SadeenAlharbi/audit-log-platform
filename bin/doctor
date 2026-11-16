@@ -64,6 +64,18 @@ clock_check() {
     echo "OK"
 }
 step "clock (2FA needs the container clock in sync)" clock_check
+offsite_check() {
+    local env remote
+    env=$(grep -E '^APP_ENV=' .env | cut -d= -f2)
+    remote=$(grep -E '^BACKUP_RCLONE_REMOTE=' .env | cut -d= -f2)
+    echo "APP_ENV=$env BACKUP_RCLONE_REMOTE=${remote:-<empty>}"
+    if [ "$env" = production ] && { [ -z "$remote" ] || [ "${remote#/}" != "$remote" ]; }; then
+        echo "WARNING: production backups must go to a real off-site remote (offsite:<bucket>), not a local path."
+        return 1
+    fi
+    echo "OK"
+}
+step "off-site backup target" offsite_check
 step "about" docker compose exec -T app php artisan about --only=environment,drivers
 step "migrate --seed" docker compose exec -T app php artisan migrate --seed --force
 step "partitions" docker compose exec -T app php artisan audit:partitions

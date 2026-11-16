@@ -161,6 +161,9 @@ services:
       - backups:/backups
       # Shared with the app: manual run requests in, status + reports out.
       - ./storage/app/backup-spool:/spool
+      # Development stand-in for the off-site storage: BACKUP_RCLONE_REMOTE=/offsite
+      # (a separate volume, so `make offsite-drill` can be practised for free).
+      - offsite-sim:/offsite
     depends_on:
       mariadb:
         condition: service_healthy
@@ -192,6 +195,7 @@ services:
       start_period: 30s
 
 volumes:
+  offsite-sim:
   mariadb-data:
   redis-data:
   backups:

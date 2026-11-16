@@ -5,6 +5,9 @@
 #   backup.sh incremental   incremental on top of the latest full/incremental
 #   backup.sh binlogs       copy closed binary logs (point-in-time recovery)
 #   backup.sh restore-test  restore the latest chain into a temporary server and verify it
+#   backup.sh offsite-drill download the latest full backup from the off-site copy,
+#                           decrypt it with the private key (AGE_IDENTITY_FILE,
+#                           mounted only for the drill) and verify it the same way
 #   backup.sh schedule      loop: requests from the app every minute, full daily,
 #                           incremental + binlogs hourly, restore test weekly
 #
@@ -202,10 +205,13 @@ cleanup_local() {
     find "$BACKUP_ROOT/binlogs" "$BACKUP_ROOT/artifacts" -type f -mtime +"$LOCAL_KEEP_DAYS" -delete 2>/dev/null || true
 }
 
+# run_restore_test [<prepared-source-dir> <label>]
+# Without arguments: the latest local chain (full + incrementals).
 run_restore_test() {
     local started; started="$(now_iso)"
     local t0; t0="$(date +%s)"
-    local full; full="$(latest_full)"
+    local source_label="${2:-local chain}"
+    local full; full="${1:-$(latest_full)}"
     if [ -z "$full" ]; then
         write_status restore_test failed "$started" "" "" "" "no full backup to restore" "{}"
         return 1
@@ -216,7 +222,9 @@ run_restore_test() {
     trap 'mariadb-admin --socket="'"$work"'/mysqld.sock" -uroot shutdown >/dev/null 2>&1 || true; rm -rf "'"$work"'"; trap - RETURN' RETURN
 
     local chain=("$full")
-    while read -r inc; do chain+=("$inc"); done < <(ls -1d "$BACKUP_ROOT"/incremental/* 2>/dev/null | sort | awk -v f="$(basename "$full")" -F/ '$NF > f')
+    if [ -z "${1:-}" ]; then
+        while read -r inc; do chain+=("$inc"); done < <(ls -1d "$BACKUP_ROOT"/incremental/* 2>/dev/null | sort | awk -v f="$(basename "$full")" -F/ '$NF > f')
+    fi
 
     log "restore test: ${#chain[@]} backup(s) from $(basename "$full")"
     # Work on copies only: "--prepare --incremental-dir" consumes (moves) the
@@ -284,6 +292,7 @@ run_restore_test() {
 | | |
 |---|---|
 | Date (UTC) | $started |
+| Source | $source_label |
 | Result | **$status** |
 | Restore chain | $(for c in "${chain[@]}"; do printf '%s ' "$(basename "$c")"; done) |
 | Restore time (RTO evidence) | ${seconds}s |
@@ -297,9 +306,50 @@ ${error:+**Error:** $error}
 MD
 
     write_status restore_test "$status" "$started" "" "local:$report" "" "$error" \
-        "{\"rows\":$rows,\"rows_upto\":$restored_upto,\"live_rows_upto\":$live_upto,\"max_id\":$max_id,\"expected_min_id\":$expected,\"tables\":$(wc -w <<< "$tables"),\"chain\":${#chain[@]},\"seconds\":$seconds}"
+        "{\"source\":\"$source_label\",\"rows\":$rows,\"rows_upto\":$restored_upto,\"live_rows_upto\":$live_upto,\"max_id\":$max_id,\"expected_min_id\":$expected,\"tables\":$(wc -w <<< "$tables"),\"chain\":${#chain[@]},\"seconds\":$seconds}"
     log "restore test $status in ${seconds}s (rows=$rows)"
     [ "$status" = succeeded ]
+}
+
+# Quarterly drill (D13): proves the off-site copy and the private key
+# actually restore, not only the local chain the weekly test uses.
+run_offsite_drill() {
+    local started; started="$(now_iso)"
+    if [ -z "$RCLONE_REMOTE" ]; then
+        write_status restore_test failed "$started" "" "" "" "off-site drill: BACKUP_RCLONE_REMOTE is not set" "{}"
+        log "ERROR: BACKUP_RCLONE_REMOTE is not set"; return 1
+    fi
+    if [ -z "$AGE_IDENTITY_FILE" ] || [ ! -r "$AGE_IDENTITY_FILE" ]; then
+        write_status restore_test failed "$started" "" "" "" "off-site drill: the private key (AGE_IDENTITY_FILE) is not mounted" "{}"
+        log "ERROR: mount the private age key and set AGE_IDENTITY_FILE"; return 1
+    fi
+
+    local name; name="$(rclone lsf "$RCLONE_REMOTE/db/full/" 2>/dev/null | sort | tail -n1 || true)"
+    if [ -z "$name" ]; then
+        write_status restore_test failed "$started" "" "" "" "off-site drill: no full backup in $RCLONE_REMOTE/db/full/" "{}"
+        log "ERROR: no full backup off-site yet"; return 1
+    fi
+
+    local drill; drill="$(mktemp -d /tmp/offsite-drill.XXXXXX)"
+    log "off-site drill: downloading $RCLONE_REMOTE/db/full/$name"
+    local ok=true
+    rclone copyto "$RCLONE_REMOTE/db/full/$name" "$drill/$name" || ok=false
+    if $ok && [[ "$name" == *.age ]]; then
+        age -d -i "$AGE_IDENTITY_FILE" -o "$drill/full.tar.gz" "$drill/$name" || ok=false
+    elif $ok; then
+        mv "$drill/$name" "$drill/full.tar.gz"
+    fi
+    mkdir -p "$drill/full"
+    $ok && { tar -xzf "$drill/full.tar.gz" -C "$drill/full" || ok=false; }
+    if ! $ok; then
+        write_status restore_test failed "$started" "" "" "" "off-site drill: download, decryption or extraction of $name failed" "{}"
+        rm -rf "$drill"; log "ERROR: off-site drill failed before the restore"; return 1
+    fi
+
+    local rc=0
+    run_restore_test "$drill/full" "off-site copy $name (downloaded, decrypted with the private key)" || rc=$?
+    rm -rf "$drill"
+    return $rc
 }
 
 process_requests() {
@@ -348,6 +398,7 @@ case "${1:-schedule}" in
     incremental) run_backup incremental ;;
     binlogs) run_binlogs ;;
     restore-test) run_restore_test ;;
+    offsite-drill) run_offsite_drill ;;
     schedule) do_schedule ;;
-    *) echo "usage: $0 {full|incremental|binlogs|restore-test|schedule}" >&2; exit 2 ;;
+    *) echo "usage: $0 {full|incremental|binlogs|restore-test|offsite-drill|schedule}" >&2; exit 2 ;;
 esac

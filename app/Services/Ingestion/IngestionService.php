@@ -152,6 +152,9 @@ class IngestionService
     private function dispatch(array $rows, ?int $batchId): void
     {
         $job = (new StoreAuditLogs($rows, $batchId))->onQueue((string) config('audit.api.queue', 'ingest'));
+        if (config('queue.default') === 'redis') {
+            $job->onConnection('redis-ingest'); // shorter retry_after, config/queue.php
+        }
 
         try {
             // Explicit dispatch (PendingDispatch only pushes in its

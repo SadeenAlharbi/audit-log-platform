@@ -54,3 +54,15 @@
 - **أوامر النسخ:** `Process` بمصفوفة وسائط (لا shell injection)، وملفات الـ spool يولّدها التطبيق.
 - **الاستعادة:** تتحقق من SHA-256 قبل الإدخال.
 - **slug المشروع:** غير قابل للتعديل.
+
+## تغطية إخفاء البيانات (D8)
+
+ما يُحذف وما يُخفى يُضبط في `config/audit.php` (`masking`). المطابقة لا تفرّق بين الحروف الكبيرة والصغيرة، وتلتقط المفتاح داخل اسم أطول (`user_password`، `accessToken`، `DBPassword`)، وعلى أي عمق داخل `old_values` و`new_values` و`metadata`.
+
+| النوع | المفاتيح | ماذا يحدث |
+|---|---|---|
+| لا يُخزَّن أبدًا (`never_store`) | password، passwd، pwd، passphrase، secret، token، api_key، authorization، credential(s)، cookie، jwt، private_key، otp، pin، card_number، credit_card، pan، cvv، cvc | يُستبدل بـ `[REDACTED]` عند الاستلام، قبل أي كتابة. غير موجود في القاعدة ولا الأرشيف ولا النسخ، ولا تكشفه أي صلاحية |
+| بيانات شخصية (`keys`) | iban، ssn، national_id، iqama، passport، date_of_birth، dob | تُخزَّن كما هي، وتُخفى (`********`) في اللوحة والتصدير والـ API إلا لمن يملك «كشف البيانات الحساسة» |
+| قيم تشبه الأسرار | Bearer tokens، JWT، مفاتيح المنصة `alh_` | تُحذف أيًا كان اسم الحقل |
+
+**حدود معروفة:** النصوص الحرة لا تُفحص (مثل `"note": "رقم الهوية 1234"`). البريد والجوال لا يُخفيان افتراضيًا لأنهما يعرّفان الفاعل في أغلب السجلات. لإضافة مفتاح، أضفه إلى القائمة المناسبة في `config/audit.php`، ويسري على الجديد فورًا وعلى العرض للقديم. والاختبارات في `tests/Feature/Api/MaskingTest.php`.

@@ -116,6 +116,8 @@ final class Labels
         'backup.project_restore_requested' => 'طلب استعادة مشروع',
         'backup.restore_recorded' => 'تسجيل استعادة',
         'sso.configured' => 'إعداد الدخول الموحد (SAML)',
+        'config.baseline' => 'تسجيل الإعدادات الأولى',
+        'config.changed' => 'تغيير في الإعدادات',
     ];
 
     /** @var array<string, string> */

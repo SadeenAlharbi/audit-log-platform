@@ -41,10 +41,10 @@ After that, `docker compose up -d` is all you need.
 | `redis` | Queues, cache, sessions and rate limiting |
 | `queue-worker` | Horizon: stores received logs |
 | `scheduler` | Scheduled tasks: partitions, archiving, retention, backups, alerts |
-| `backup` | Daily full and hourly incremental mariadb-backup, binary logs, age encryption, rclone upload (production), weekly restore test |
+| `backup` | Daily full and hourly incremental mariadb-backup, binary logs, age encryption, rclone upload with byte-for-byte check, weekly restore test |
 | `keycloak` | Development SAML identity provider, only with `make sso` (profile `sso`) |
 
-> In development the archive and backups stay local (`storage/app/archive`, `storage/app/backups` and the `backups` volume). In production they go to off-server S3 (runbook §1).
+> In development the archive stays local (`storage/app/archive`) and the encrypted backups go to the `offsite-sim` volume, which stands in for off-site storage (`BACKUP_RCLONE_REMOTE=/offsite`). In production both go to off-server S3 (runbook §1).
 
 ### Useful commands
 
@@ -58,6 +58,7 @@ make analyse     # PHPStan / Larastan level 6
 make fresh       # rebuild the database from scratch
 ./bin/doctor     # full health check, report in storage/logs/doctor.log
 make sso         # SAML single sign-on with a local Keycloak (SAML2_ENABLED=true first)
+make offsite-drill # restore drill from the off-site copy with the private key
 make partitions  # audit_logs partitions
 make schema-dump # refresh database/schema/schema.sql
 ```
@@ -99,7 +100,8 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 - **Isolation:** every query is scoped to the projects the user or API key may access.
 - **Sensitive data:** credentials (passwords, tokens, card numbers) are removed before storage; personal data is masked on display unless the viewer has the "view sensitive data" permission.
 - **Retention:** monthly partitions; logs are archived as compressed JSONL, kept for a grace period, then deleted according to each project's retention.
-- **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site, with a weekly automated restore test.
+- **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site and checked byte for byte, with a weekly automated restore test and a quarterly drill from the off-site copy (`make offsite-drill`).
+- **Self-audit:** sign-ins, role and key changes, exports, backups and every change of the `.env` settings (`audit:config-check`) are recorded in the immutable `platform_audit` table.
 - **Dashboard roles:** Super Admin, Platform Auditor, Security Officer, Project Owner, Project Viewer, plus custom roles. Two-factor authentication is mandatory for platform-wide roles.
 - **Single sign-on (optional):** SAML 2.0 next to e-mail and password (`scaler-tech/laravel-saml2`). Only existing, active accounts can sign in, matched by e-mail, and the platform's 2FA is always asked after SAML. Setup: [docs/runbook.md §1.6](docs/runbook.md); locally, `make demo` then `make sso` starts Keycloak with demo users.
 
@@ -126,7 +128,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 194 tests against a real MariaDB (partitioning and triggers need the real engine).
+- **Pest:** 210 tests against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
 - **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api`.
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.
@@ -141,3 +143,45 @@ Most documents under `docs/` are written in Arabic.
 - One migration per table, containing all its columns, indexes, constraints and triggers.
 - **Before the first deployment:** edit the table's original migration and run `make fresh`; no "alter" migrations.
 - **After the first deployment:** only additional, reversible migrations with a tested `down()`.
+
+---
+
+## Handover notes
+
+**Status (2026-11-16):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
+
+### Where things are
+
+| Area | Code |
+|---|---|
+| API: routes, middleware (key, signature, HTTPS, limits) | `routes/api.php`, `app/Http/Middleware/Api/`, `app/Http/Controllers/Api/V1/` |
+| Ingestion: validation, idempotency, queue, storage job | `app/Services/Ingestion/`, `app/Jobs/StoreAuditLogs.php` |
+| Masking | `app/Services/Security/SensitiveDataMasker.php`, `config/audit.php` (`masking`) |
+| Archive, retention, partitions | `app/Services/Archive/`, `app/Console/Commands/` |
+| Backups (app side / container side) | `app/Services/Backup/`, `docker/backup/backup.sh` |
+| Dashboard (Filament 5) | `app/Filament/` (Arabic labels: `app/Filament/Support/Labels.php`) |
+| Sign-in, 2FA, SAML | `app/Filament/Pages/Auth/`, `app/Filament/Auth/`, `app/Listeners/HandleSamlSignIn.php`, `config/saml2.php` |
+| Permissions | `app/Policies/`, `database/seeders/RolesAndPermissionsSeeder.php`, `docs/permissions-matrix.md` |
+| Settings | `config/audit.php`, `.env.docker.example` (every variable, with comments) |
+| Scheduled tasks | `routes/console.php` |
+
+### Conventions
+
+- Code, comments and commit messages in English; the dashboard and most documents in Arabic.
+- Every change comes with tests; `./bin/doctor` must end without errors before a push (tests, Pint, PHPStan, clock and off-site checks).
+- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D20).
+- `app/Filament/Auth/SetUpAppAuthenticationAction.php` is a copy of a Filament class with two changes (see its header): re-check it when upgrading Filament.
+
+### Before production
+
+1. Fill the production values of runbook §1.2 (`APP_ENV=production`, real S3 bucket for `AUDIT_ARCHIVE_*` and `BACKUP_RCLONE_REMOTE=offsite:<bucket>`, mail and Slack alerts, `TRUSTED_PROXIES`).
+2. Keep the private backup key (`secrets/backup-age-identity.txt`) off the server, in a password manager or vault.
+3. Run `make offsite-drill` once against the real bucket and keep the report in `docs/reports/`.
+4. Optional: connect the company identity provider (runbook §1.6).
+
+### Known limits
+
+- Free-text values are not scanned for personal data; only known keys are masked ([docs/security-review.md](docs/security-review.md)).
+- "Logs today" on the dashboard counts by UTC day.
+- On Linux hosts, `storage/` must be writable by the container user (uid 33); macOS and Windows need nothing.
+

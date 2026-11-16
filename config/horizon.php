@@ -98,7 +98,7 @@ return [
     */
 
     'waits' => [
-        'redis:ingest' => 60,
+        'redis-ingest:ingest' => 60,
         'redis:default' => 300,
     ],
 
@@ -203,7 +203,7 @@ return [
     'defaults' => [
         // Ingestion first: accepted logs must be stored quickly.
         'supervisor-ingest' => [
-            'connection' => 'redis',
+            'connection' => 'redis-ingest', // retry_after 180 s (config/queue.php)
             'queue' => ['ingest'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',

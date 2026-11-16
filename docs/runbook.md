@@ -275,6 +275,17 @@ dc exec app php artisan audit:restore-archive erp --from=2026-09-01 --to=2026-09
 
 التقرير يُحفظ في `storage/app/backup-spool/reports/`، والنتيجة في `backup_runs`. **فشل الاختبار يرسل تنبيهًا فوريًا.**
 
+**تمرين النسخة الخارجية (كل 3 أشهر، D13):** الاختبار الأسبوعي يستعيد النسخ المحلية. هذا التمرين يثبت أن النسخة الخارجية **والمفتاح الخاص** يستعيدان فعلًا:
+
+```bash
+make offsite-drill
+```
+
+ينزّل آخر نسخة كاملة من `BACKUP_RCLONE_REMOTE`، ويفك تشفيرها بالمفتاح الخاص، ويستعيدها في خادم مؤقت بنفس الفحوص، ويكتب التقرير في `storage/app/backup-spool/reports/` (المصدر: off-site copy). انسخ التقرير إلى `docs/reports/`.
+
+- **الإنتاج:** المفتاح الخاص لا يبقى على الخادم. انسخه مؤقتًا إلى `secrets/backup-age-identity.txt` للتمرين ثم احذفه، أو شغّل التمرين على خادم آخر.
+- **التطوير:** `BACKUP_RCLONE_REMOTE=/offsite` (volume منفصل يحاكي التخزين الخارجي). خذ نسخة كاملة أولًا: `dc exec backup backup.sh full`.
+
 ---
 
 ## 4. مفاتيح API

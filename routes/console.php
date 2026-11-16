@@ -29,11 +29,14 @@ Schedule::command('backup:run --type=app')->dailyAt('03:00')->onOneServer();
 Schedule::command('backup:clean')->dailyAt('04:00')->onOneServer();
 Schedule::command('backup:monitor')->everyFiveMinutes()->onOneServer()->withoutOverlapping();
 
+// Decision D16: settings live in .env; record any change in platform_audit.
+Schedule::command('audit:config-check')->hourly()->onOneServer();
+
 // Security and access.
 Schedule::command('api-keys:expiring')->dailyAt('08:00')->onOneServer();
 Schedule::command('access:review --sensitive-only')->monthlyOn(1, '07:00')->onOneServer();
 Schedule::command('access:review')->quarterlyOn(1, '07:30')->onOneServer();
 
 // Queues (plan §11): alert when jobs pile up; Horizon metrics.
-Schedule::command('queue:monitor redis:ingest,redis:default --max='.(int) config('audit.alerts.queue_backlog_threshold', 5000))->everyFiveMinutes();
+Schedule::command('queue:monitor redis-ingest:ingest,redis:default --max='.(int) config('audit.alerts.queue_backlog_threshold', 5000))->everyFiveMinutes();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();

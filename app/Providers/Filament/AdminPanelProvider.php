@@ -2,7 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\AppAuthentication;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\SetUpTwoFactor;
 use App\Filament\Support\InitialsAvatarProvider;
 use App\Filament\Support\PlatformsCode;
 use App\Filament\Widgets\ActiveProjectsTable;
@@ -11,7 +13,6 @@ use App\Filament\Widgets\PlatformStats;
 use App\Filament\Widgets\TopEventsTable;
 use App\Http\Middleware\Filament\Authenticate;
 use App\Http\Middleware\Filament\RequireMfaForPrivilegedRoles;
-use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -46,7 +47,7 @@ class AdminPanelProvider extends PanelProvider
             // RequireMfaForPrivilegedRoles; optional for everyone else.
             ->multiFactorAuthentication([
                 AppAuthentication::make()->recoverable(),
-            ], isRequired: true)
+            ], setUpRequiredAction: SetUpTwoFactor::class, isRequired: true)
             ->multiFactorAuthenticationRequiredMiddlewareName(RequireMfaForPrivilegedRoles::class)
             // Platforms Code (DGA unified design system): colours and typeface.
             ->colors(PlatformsCode::colors())

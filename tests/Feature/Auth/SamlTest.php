@@ -1,9 +1,11 @@
 <?php
 
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\SetUpTwoFactor;
 use App\Listeners\HandleSamlSignIn;
 use App\Models\PlatformAudit;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -99,6 +101,14 @@ function postSaml(TestCase $test, string $email, bool $signed = true, ?string $a
     } finally {
         $_POST = [];
     }
+}
+
+/** Opens the "set up authenticator app" modal and returns the secret it shows. */
+function mountTwoFactorSetup($page): string
+{
+    $page->mountAction(TestAction::make('setUpAppAuthentication')->schemaComponent('app.actions'));
+
+    return decrypt($page->instance()->getMountedAction()->getArguments()['encrypted'])['secret'];
 }
 
 function samlAccount(string $role = 'project_viewer', bool $withMfa = false, bool $active = true): User
@@ -244,4 +254,44 @@ XML)]);
         ->and($tenant->idp_login_url)->toBe(SAML_IDP.'/protocol/saml')
         ->and($tenant->idp_x509_cert)->toBe($certBody)
         ->and(PlatformAudit::query()->where('action', 'sso.configured')->count())->toBe(2);
+});
+
+it('sets up 2FA after SAML without asking for a platform password', function () {
+    $user = samlAccount();
+    postSaml($this, 'sara@company.test');
+
+    $page = Livewire::test(SetUpTwoFactor::class)->assertSee('دخلت عبر SAML');
+    $secret = mountTwoFactorSetup($page);
+
+    $page->setActionData(['code' => app(Google2FA::class)->getCurrentOtp($secret)])
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->app_authentication_secret)->toBe($secret);
+});
+
+it('still asks for the current password when 2FA is set up after a password login', function () {
+    $user = samlAccount();
+    $this->actingAs($user);
+
+    $page = Livewire::test(SetUpTwoFactor::class);
+    $secret = mountTwoFactorSetup($page);
+
+    $page->setActionData(['code' => app(Google2FA::class)->getCurrentOtp($secret)])
+        ->callMountedAction()
+        ->assertHasFormErrors(['password']);
+
+    expect($user->fresh()->app_authentication_secret)->toBeNull();
+});
+
+it('offers a way out of the 2FA setup page', function () {
+    samlAccount();
+    postSaml($this, 'sara@company.test');
+    $this->assertAuthenticated();
+
+    Livewire::test(SetUpTwoFactor::class)
+        ->callAction(TestAction::make('signOut')->schemaComponent('footer-actions'))
+        ->assertRedirect(Filament::getLoginUrl());
+
+    $this->assertGuest();
 });

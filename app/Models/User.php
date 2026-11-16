@@ -127,7 +127,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             || $this->roles->contains(fn ($role) => ($role->scope ?? 'platform') === 'platform')
             || $this->projectIdsWith('logs.view_sensitive') !== []
             // Decision D15: after a SAML sign-in the platform's 2FA is always required.
-            || (request()->hasSession() && request()->session()->get('auth.via') === 'saml');
+            || (app()->bound('session') && session('auth.via') === 'saml');
     }
 
     /* ---------------------------------------------------------------

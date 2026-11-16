@@ -55,11 +55,15 @@ class PlatformStats extends StatsOverviewWidget
                 ->description($trend === null ? 'منذ منتصف الليل (UTC)' : ($trend >= 0 ? "+{$trend}% عن أمس" : "{$trend}% عن أمس"))
                 ->color('primary'),
             Stat::make('أحداث حرجة اليوم', number_format($data['critical']))
+                ->description('خطورة «حرج»')
                 ->color($data['critical'] > 0 ? 'danger' : 'success'),
-            Stat::make('مشاريع نشطة', number_format($data['projects'])),
-            $data['rejected'] === null ? null : Stat::make('محاولات مرفوضة (24 ساعة)', number_format($data['rejected']))
+            Stat::make('مشاريع نشطة', number_format($data['projects']))
+                ->description('متصلة بالمنصة'),
+            $data['rejected'] === null ? null : Stat::make('محاولات مرفوضة', number_format($data['rejected']))
+                ->description('آخر 24 ساعة')
                 ->color($data['rejected'] > 0 ? 'warning' : 'success'),
-            Stat::make('دفعات فاشلة (24 ساعة)', number_format($data['failed_batches']))
+            Stat::make('دفعات فاشلة', number_format($data['failed_batches']))
+                ->description('آخر 24 ساعة')
                 ->color($data['failed_batches'] > 0 ? 'danger' : 'success'),
         ]));
     }

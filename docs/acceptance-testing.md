@@ -325,12 +325,12 @@ curl -s -o /dev/null -w '%{http_code}\n' -X DELETE "$API/logs/01JABCDEF012345678
   - **سجلات اليوم / أنشط المشاريع / أكثر الأحداث:** ترتفع مع كل سجل ترسله (5.1 أو 3.4).
   - **أحداث حرجة اليوم:** أرسل سجلًا فيه `"severity":"critical"` (مثل 5.1 مع إضافة الحقل).
   - **المحاولات المرفوضة:** ترتفع مع اختبارات 5.4 و5.5.
-  - **دفعات فاشلة (24 ساعة):** دفعة قُبلت ثم تعذّر حفظها في القاعدة بعد 5 محاولات خلال نحو 4 دقائق (عطل في القاعدة مثلًا). في الوضع السليم تبقى 0 باللون الأخضر، وهذا هو المطلوب. دفعة كل سجلاتها خاطئة لا تُعد هنا؛ تُرفض فورًا بـ 422.
+  - **دفعات فاشلة (آخر 24 ساعة):** دفعة قُبلت ثم تعذّر حفظها في القاعدة بعد 5 محاولات خلال نحو 4 دقائق (عطل في القاعدة مثلًا). في الوضع السليم تبقى 0 باللون الأخضر، وهذا هو المطلوب. دفعة كل سجلاتها خاطئة لا تُعد هنا؛ تُرفض فورًا بـ 422.
 - لرؤية مؤشر الدفعات الفاشلة يتغير (محاكاة عطل في الحفظ):
 ```bash
 docker compose exec app php artisan tinker --execute='$k = App\Models\ProjectApiKey::withoutGlobalScopes()->first(); $b = App\Models\IngestionBatch::create(["project_id" => $k->project_id, "api_key_id" => $k->id, "count" => 1, "accepted_count" => 1, "duplicate_count" => 0, "rejected_count" => 0, "status" => "queued"]); (new App\Jobs\StoreAuditLogs([], $b->id))->failed(new RuntimeException("acceptance test"));'
 ```
-- ✅ المتوقع: «دفعات فاشلة (24 ساعة)» = 1 باللون الأحمر بعد تحديث الصفحة، وتنبيه `Audit logs could not be stored` في `docker compose logs app`. يعود إلى 0 بعد 24 ساعة.
+- ✅ المتوقع: «دفعات فاشلة» = 1 باللون الأحمر بعد تحديث الصفحة، وتنبيه `Audit logs could not be stored` في `docker compose logs app`. يعود إلى 0 بعد 24 ساعة.
 
 **8.2 Horizon**
 - افتح http://localhost:8080/horizon بحساب admin.

@@ -35,3 +35,6 @@ Thumbs.db
 
 # The plan document stays on the owner's machine only.
 /Audit-Log-Platform-Plan-v*.pdf
+
+# Intermediate files of docs/product/source/render.py
+docs/product/source/*.pdf

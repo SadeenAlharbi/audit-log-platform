@@ -59,7 +59,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(Width::Full)
             // A fixed, slim sidebar (it never collapses to icons) and no
             // global search box: each list page has its own search and filters.
-            ->sidebarWidth('15rem')
+            ->sidebarWidth('16.5rem')
             ->globalSearch(false)
             ->navigationGroups([
                 NavigationGroup::make('السجلات')->collapsible(false),

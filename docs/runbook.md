@@ -132,6 +132,8 @@ dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ
 
 **التطوير:** `SAML2_ENABLED=true` في `.env`، ثم `make demo` و`make sso`. يشغّل Keycloak على http://localhost:8180 (المدير admin / admin) بمستخدمين `admin@demo.test` وغيرهم بكلمة مرور `Demo-SSO-2026!`، و`outsider@demo.test` لتجربة رفض من لا حساب له.
 
+**إذا رُفض رمز المصادقة الثنائية وهو صحيح:** الرموز مرتبطة بالوقت، وتُقبل حتى 4 دقائق فرق. ساعة Docker Desktop على Mac تتأخر بعد السكون، فتُرفض كل الرموز. صفحة الدخول تُظهر تنبيهًا أحمر إذا فرق الساعة أكثر من 90 ثانية، و`./bin/doctor` يفحصه أيضًا. الحل: إعادة تشغيل Docker Desktop.
+
 **إيقاف SAML:** `SAML2_ENABLED=false` ثم `dc up -d`. الدخول بكلمة المرور يبقى كما هو.
 
 ---

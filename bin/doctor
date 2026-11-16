@@ -49,6 +49,21 @@ if ! grep -qE '^APP_KEY=.+' .env; then
 fi
 
 step "runtime DB grants (must not include ALTER/DROP/TRIGGER on the app database)" docker compose exec -T mariadb sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "SHOW GRANTS FOR \`$DB_USERNAME\`@\`%\`"'
+clock_check() {
+    # 2FA codes are time-based: a container clock that drifted (Docker Desktop
+    # after the Mac sleeps) makes every correct code fail.
+    local host app diff
+    host=$(date -u +%s)
+    app=$(docker compose exec -T app date -u +%s 2>/dev/null | tr -d '\r')
+    diff=$(( app - host )); diff=${diff#-}
+    echo "host $(date -u +%T) UTC, app container $(date -u -r "$app" +%T 2>/dev/null || date -u -d "@$app" +%T) UTC, difference ${diff}s"
+    if [ "$diff" -gt 30 ]; then
+        echo "WARNING: the container clock is off by ${diff}s. 2FA codes will be refused. Restart Docker Desktop, then run ./bin/doctor again."
+        return 1
+    fi
+    echo "OK"
+}
+step "clock (2FA needs the container clock in sync)" clock_check
 step "about" docker compose exec -T app php artisan about --only=environment,drivers
 step "migrate --seed" docker compose exec -T app php artisan migrate --seed --force
 step "partitions" docker compose exec -T app php artisan audit:partitions

@@ -42,13 +42,52 @@ use SensitiveParameter;
 
 /**
  * Filament's "set up authenticator app" action (filament/filament v5),
- * copied with one change: after a SAML sign-in (decision D15) the "current
- * password" field is not asked. The identity provider has just verified
- * the user, and SSO users often have no platform password to type.
+ * copied with two changes:
+ *
+ * - after a SAML sign-in (decision D15) the "current password" field is not
+ *   asked: the identity provider has just verified the user, and SSO users
+ *   often have no platform password to type;
+ * - the secret (QR code) stays the same until setup succeeds, instead of a
+ *   new one each time the window opens: a user who scanned it, closed the
+ *   window and came back otherwise types codes for a secret that no longer
+ *   exists and is told they are wrong.
+ *
  * Keep in step with the vendor class on Filament upgrades.
  */
 class SetUpAppAuthenticationAction
 {
+    public const PENDING_SECRET = 'mfa.pending_setup';
+
+    /**
+     * The secret and recovery codes being set up for the current user,
+     * kept (encrypted) in the session until setup succeeds.
+     *
+     * @return array{secret: string, recoveryCodes?: list<string>}
+     */
+    public static function pendingSetup(AppAuthentication $appAuthentication): array
+    {
+        $userKey = Filament::getUserScopedAuthIdentifier();
+
+        try {
+            $pending = decrypt((string) session(self::PENDING_SECRET));
+        } catch (\Throwable) {
+            $pending = null;
+        }
+
+        if (! is_array($pending) || ($pending['userKey'] ?? null) !== $userKey || ! is_string($pending['secret'] ?? null)) {
+            $pending = [
+                'secret' => $appAuthentication->generateSecret(),
+                ...($appAuthentication->isRecoverable() ? ['recoveryCodes' => $appAuthentication->generateRecoveryCodes()] : []),
+                'userKey' => $userKey,
+            ];
+            session([self::PENDING_SECRET => encrypt($pending)]);
+        }
+
+        unset($pending['userKey']);
+
+        return $pending;
+    }
+
     public static function viaSaml(): bool
     {
         return app()->bound('session') && session('auth.via') === 'saml';
@@ -98,10 +137,7 @@ class SetUpAppAuthenticationAction
 
                 $livewire->mergeMountedActionArguments([
                     'encrypted' => encrypt([
-                        'secret' => $appAuthentication->generateSecret(),
-                        ...($appAuthentication->isRecoverable()
-                            ? ['recoveryCodes' => $appAuthentication->generateRecoveryCodes()]
-                            : []),
+                        ...self::pendingSetup($appAuthentication),
                         'userKey' => Filament::getUserScopedAuthIdentifier(),
                     ]),
                 ]);
@@ -237,6 +273,7 @@ class SetUpAppAuthenticationAction
                         $appAuthentication->saveRecoveryCodes($user, $encrypted['recoveryCodes']);
                     }
                 });
+                session()->forget(self::PENDING_SECRET);
 
                 Notification::make()
                     ->title(__('filament-panels::auth/multi-factor/app/actions/set-up.notifications.enabled.title'))

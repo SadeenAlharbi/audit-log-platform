@@ -54,6 +54,7 @@ class AdminPanelProvider extends PanelProvider
             ->font(PlatformsCode::FONT)
             ->renderHook(PanelsRenderHook::STYLES_AFTER, fn (): View => view('filament.partials.platforms-code-styles'))
             ->renderHook(PanelsRenderHook::FOOTER, fn (): View => view('filament.partials.footer'))
+            ->renderHook(PanelsRenderHook::BODY_START, fn (): View => view('filament.partials.clock-check'))
             ->maxContentWidth(Width::Full)
             // A fixed, slim sidebar (it never collapses to icons) and no
             // global search box: each list page has its own search and filters.

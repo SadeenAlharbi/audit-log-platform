@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Auth\SetUpAppAuthenticationAction;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\SetUpTwoFactor;
 use App\Listeners\HandleSamlSignIn;
@@ -294,4 +295,26 @@ it('offers a way out of the 2FA setup page', function () {
         ->assertRedirect(Filament::getLoginUrl());
 
     $this->assertGuest();
+});
+
+it('keeps the same QR secret when the setup window is closed and opened again', function () {
+    $user = samlAccount();
+    postSaml($this, 'sara@company.test');
+
+    $first = mountTwoFactorSetup(Livewire::test(SetUpTwoFactor::class));
+    $second = mountTwoFactorSetup(Livewire::test(SetUpTwoFactor::class));
+    expect($second)->toBe($first);
+
+    // Once set up, the pending secret is gone.
+    $page = Livewire::test(SetUpTwoFactor::class);
+    $secret = mountTwoFactorSetup($page);
+    $page->setActionData(['code' => app(Google2FA::class)->getCurrentOtp($secret)])->callMountedAction();
+    expect($user->fresh()->app_authentication_secret)->toBe($first)
+        ->and(session(SetUpAppAuthenticationAction::PENDING_SECRET))->toBeNull();
+});
+
+it('warns on the login page when the server clock is off', function () {
+    $this->get('/admin/login')->assertOk()
+        ->assertSee('alh-clock-warning', false)
+        ->assertSee('Date.now()', false);
 });

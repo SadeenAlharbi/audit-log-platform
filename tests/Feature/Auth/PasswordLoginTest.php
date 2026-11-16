@@ -3,6 +3,7 @@
 use App\Filament\Pages\Auth\EditProfile;
 use App\Filament\Pages\Auth\Login;
 use App\Models\PlatformAudit;
+use App\Models\Project;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
@@ -103,4 +104,30 @@ it('locks the account after five wrong 2FA codes following a correct password', 
         ->call('authenticate');
     expect($page->errors()->first('data.email'))->toContain('مقفل مؤقتًا');
     $this->assertGuest();
+});
+
+it('offers the demo accounts under the form only in local/review, and signs in with one click', function () {
+    $owner = projectUser(Project::factory()->create(), 'project_owner');
+    $owner->forceFill(['email' => 'owner@demo.test', 'password' => config('audit.demo_password')])->save();
+
+    // Testing / production: no list, and the action is refused.
+    Livewire::test(Login::class)->assertDontSee('حسابات تجريبية');
+    app()->detectEnvironment(fn () => 'production');
+    Livewire::test(Login::class)->assertDontSee('owner@demo.test')->call('loginAsDemo', 'owner@demo.test')->assertStatus(404);
+    $this->assertGuest();
+
+    app()->detectEnvironment(fn () => 'local');
+    Livewire::test(Login::class)
+        ->assertSee('حسابات تجريبية')
+        ->assertSee('owner@demo.test')
+        ->assertDontSee('admin@demo.test') // not created: not listed
+        ->call('loginAsDemo', 'owner@demo.test');
+    expect(Filament::auth()->id())->toBe($owner->id);
+
+    // Only the listed demo accounts.
+    Filament::auth()->logout();
+    Livewire::test(Login::class)->call('loginAsDemo', 'someone@example.com')->assertStatus(404);
+
+    config(['audit.demo_logins' => false]);
+    Livewire::test(Login::class)->assertDontSee('حسابات تجريبية');
 });

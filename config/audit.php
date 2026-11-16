@@ -18,6 +18,11 @@ return [
     // Password of the *@demo.test accounts created by `make demo` (dev only).
     'demo_password' => env('DEMO_PASSWORD', 'Demo!Passw0rd#2026'),
 
+    // The "demo accounts" list under the sign-in form (one click signs in as
+    // that account; 2FA still applies). Only ever shown when APP_ENV is local
+    // or review and the accounts exist (`make demo`); never in production.
+    'demo_logins' => (bool) env('AUDIT_DEMO_LOGINS', true),
+
     'retention' => [
         // D3: platform-wide ceiling. No project may keep logs longer than this.
         // Monthly partitions that are entirely older than this are archived

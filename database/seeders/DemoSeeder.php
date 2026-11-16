@@ -28,6 +28,20 @@ class DemoSeeder extends Seeder
 {
     public const PASSWORD = 'Demo!Passw0rd#2026';
 
+    /**
+     * One account per role: e-mail, name (shown as the role on the sign-in
+     * page's demo list), role, project slug for project roles.
+     *
+     * @var list<array{0: string, 1: string, 2: string, 3: string|null}>
+     */
+    public const ACCOUNTS = [
+        ['admin@demo.test', 'مدير المنصة', 'super_admin', null],
+        ['auditor@demo.test', 'مدقق المنصة', 'platform_auditor', null],
+        ['security@demo.test', 'مسؤول الأمن', 'security_officer', null],
+        ['owner@demo.test', 'مالك مشروع الموارد البشرية', 'project_owner', 'hr'],
+        ['viewer@demo.test', 'مشاهد مشروع شؤون الطلاب', 'project_viewer', 'sis'],
+    ];
+
     private const PEOPLE = ['محمد القحطاني', 'سارة الدوسري', 'عبدالله المطيري', 'ريم الحربي', 'فهد العنزي', 'هيا السبيعي', 'تركي الرشيدي', 'لمى الزهراني'];
 
     /** @var array<string, array{0: string, 1: int, 2: int, 3: list<array{0: string, 1: string, 2: string, 3: array<string, string>|null, 4: array<string, string>|null}>}> */
@@ -116,14 +130,7 @@ class DemoSeeder extends Seeder
             }
         }
 
-        $accounts = [
-            ['admin@demo.test', 'مدير المنصة', 'super_admin', null],
-            ['auditor@demo.test', 'مدقق المنصة', 'platform_auditor', null],
-            ['security@demo.test', 'مسؤول الأمن', 'security_officer', null],
-            ['owner@demo.test', 'مالك مشروع الموارد البشرية', 'project_owner', 'hr'],
-            ['viewer@demo.test', 'مشاهد مشروع شؤون الطلاب', 'project_viewer', 'sis'],
-        ];
-        foreach ($accounts as [$email, $name, $role, $projectSlug]) {
+        foreach (self::ACCOUNTS as [$email, $name, $role, $projectSlug]) {
             $user = User::query()->firstOrCreate(['email' => $email], ['name' => $name, 'password' => $password, 'is_active' => true]);
             if ($projectSlug === null) {
                 $user->syncRoles([$role]);

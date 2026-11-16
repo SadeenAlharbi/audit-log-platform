@@ -5,6 +5,7 @@ namespace App\Filament\Pages\Auth;
 use App\Listeners\HandleSamlSignIn;
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Database\Seeders\DemoSeeder;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
@@ -12,6 +13,7 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\RenderHook;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Failed;
@@ -28,6 +30,7 @@ use Throwable;
  *   Filament shows after a password), then the session is opened;
  * - the reason a SAML sign-in was refused (no account, inactive, locked);
  * - wrong 2FA codes count towards the account lockout, on both paths;
+ * - in local/review environments, a "demo accounts" list under the form;
  * - after a correct password, why the account cannot sign in (locked or
  *   suspended) instead of the generic "credentials do not match". Only
  *   someone who knows the password learns this, so it reveals nothing.
@@ -144,8 +147,49 @@ class Login extends BaseLogin
                 ->visible(fn (): bool => blank($this->userUndertakingMultiFactorAuthentication)
                     && config('audit.saml.enabled') && filled(config('audit.saml.tenant_uuid'))),
             $this->getMultiFactorChallengeFormContentComponent(),
+            View::make('filament.partials.demo-accounts')
+                ->key('demo-accounts')
+                ->viewData(fn (): array => ['accounts' => $this->demoAccounts()])
+                ->visible(fn (): bool => blank($this->userUndertakingMultiFactorAuthentication) && $this->demoAccounts() !== []),
             RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
         ]);
+    }
+
+    /**
+     * Demo accounts that exist, for the list under the form. Empty (so the
+     * list is hidden) outside local/review, when turned off, or before
+     * `make demo`.
+     *
+     * @return array<string, string> e-mail => role
+     */
+    public function demoAccounts(): array
+    {
+        if (! app()->environment(['local', 'review']) || ! config('audit.demo_logins')) {
+            return [];
+        }
+
+        $accounts = array_column(DemoSeeder::ACCOUNTS, 1, 0);
+        $existing = User::query()->whereIn('email', array_keys($accounts))->pluck('email')->all();
+
+        return array_intersect_key($accounts, array_flip($existing));
+    }
+
+    /**
+     * One click on the demo list: the normal sign-in with that account and
+     * the demo password, filled in on the server. Lockout and 2FA apply as
+     * for any sign-in.
+     */
+    public function loginAsDemo(string $email): ?LoginResponse
+    {
+        abort_unless(array_key_exists($email, $this->demoAccounts()), 404);
+
+        $this->form->fill([
+            'email' => $email,
+            'password' => (string) config('audit.demo_password', DemoSeeder::PASSWORD),
+            'remember' => false,
+        ]);
+
+        return $this->authenticate();
     }
 
     /** @return array<int, Action> */

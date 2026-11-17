@@ -3,7 +3,8 @@
     python3 render.py
 
 Writes:
-  ../product-overview.pdf             the PDF (Chromium print: A4, header band and page numbers from @page)
+  ../product-overview.pdf             the PDF: the cover, then the body pages (header band and page numbers from
+                                      the @page margin boxes, Chromium 131+), numbered from the first page after the cover
   ../product-overview-template.html   one self-contained file (images and fonts embedded) to edit in the
                                       browser and export with Ctrl+P -> Save as PDF
 
@@ -14,7 +15,7 @@ import pathlib
 import re
 
 from playwright.sync_api import sync_playwright
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 
 HERE = pathlib.Path(__file__).resolve().parent
 SRC = HERE / "product-overview.html"
@@ -38,16 +39,31 @@ def main() -> None:
     template.write_text(standalone(SRC.read_text(encoding="utf-8")), encoding="utf-8")
 
     pdf = OUT / "product-overview.pdf"
+    cover_pdf = HERE / "cover.pdf"
+    body_pdf = HERE / "body.pdf"
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.goto(SRC.as_uri())
         page.wait_for_load_state("networkidle")
         page.evaluate("document.fonts.ready")
-        page.pdf(path=str(pdf), prefer_css_page_size=True, print_background=True)
+
+        # Cover: full bleed, no header or footer.
+        page.add_style_tag(content=".sheet:not(.cover-sheet) { display: none !important; }")
+        page.pdf(path=str(cover_pdf), prefer_css_page_size=True, print_background=True)
+
+        # Body: every sheet except the cover, so the page numbers (@page margin boxes) start after it.
+        page.reload()
+        page.wait_for_load_state("networkidle")
+        page.evaluate("document.fonts.ready")
+        page.add_style_tag(content=".cover-sheet { display: none !important; }")
+        page.pdf(path=str(body_pdf), prefer_css_page_size=True, print_background=True)
         browser.close()
 
-    writer = PdfWriter(clone_from=PdfReader(pdf))
+    writer = PdfWriter()
+    for part in (cover_pdf, body_pdf):
+        writer.append(str(part))
+        part.unlink()
     writer.add_metadata({"/Title": TITLE, "/Author": "سدين الحربي"})
     with open(pdf, "wb") as fh:
         writer.write(fh)

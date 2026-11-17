@@ -22,20 +22,24 @@
     --font: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
   }
 
-  /* ---------- Print pages: header band and page numbers (Chrome 131+) ---------- */
+  /* ---------- Print pages (browser Ctrl+P, Chrome 131+): full-width header band and page numbers ----------
+     render.py prints the cover and the body separately, so in the PDF the numbering starts after the cover. */
   @page {
     size: A4;
     margin: 24mm 16mm 18mm 16mm;
-    @top-right { content: "وثيقة تعريف المنتج — منصة سجلات التدقيق المركزية"; background: #14573A; color: #fff;
-                 font-family: var(--font); font-size: 8pt; padding: 0 16mm 0 0; margin-top: 4mm; margin-bottom: 7mm; text-align: right; vertical-align: middle; }
-    @top-left { content: "Audit Log Hub"; background: #14573A; color: #fff; direction: ltr;
-                font-family: var(--font); font-size: 8pt; padding: 0 0 0 16mm; margin-top: 4mm; margin-bottom: 7mm; text-align: left; vertical-align: middle; }
+    @top-right-corner { content: ""; background: #14573A; margin-bottom: 12mm; }
+    @top-left-corner  { content: ""; background: #14573A; margin-bottom: 12mm; }
+    @top-right { content: "وثيقة تعريف المنتج — منصة سجلات التدقيق المركزية"; background: #14573A; color: #fff; width: 50%;
+                 font-family: var(--font); font-size: 8pt; margin-bottom: 12mm; text-align: right; vertical-align: middle; }
+    @top-left  { content: "Audit Log Hub"; background: #14573A; color: #fff; direction: ltr; width: 50%;
+                 font-family: var(--font); font-size: 8pt; margin-bottom: 12mm; text-align: left; vertical-align: middle; }
     @bottom-right { content: "منصة سجلات التدقيق المركزية · Audit Log Hub"; font-family: var(--font); font-size: 7.5pt; color: #6C737F; }
     @bottom-left { content: "صفحة " counter(page) " / " counter(pages); font-family: var(--font); font-size: 7.5pt; color: #6C737F; }
   }
   @page cover {
     margin: 0;
     @top-right { content: none; } @top-left { content: none; }
+    @top-right-corner { content: none; } @top-left-corner { content: none; }
     @bottom-right { content: none; } @bottom-left { content: none; }
   }
 
@@ -61,10 +65,9 @@
   /* ---------- Cover ---------- */
   .cover { height: 297mm; width: 210mm; position: relative; color: #fff; overflow: hidden;
     background: linear-gradient(160deg, #1d8a59 0%, #14573A 55%, #0c3a27 100%); }
-  .cover .mark { position: absolute; top: 28mm; left: 24mm; right: 24mm; display: flex; justify-content: space-between; align-items: center; }
+  .cover .mark { position: absolute; top: 28mm; left: 24mm; right: 24mm; display: flex; justify-content: flex-end; align-items: center; }
   .cover .logo { font-weight: 700; font-size: 15pt; direction: ltr; }
   .cover .logo small { display: block; font-weight: 400; font-size: 9pt; opacity: .8; }
-  .cover .glyph { width: 46px; height: 46px; border-radius: 10px; border: 2px solid rgba(255,255,255,.75); display: grid; place-items: center; }
   .cover .body { position: absolute; top: 112mm; right: 24mm; left: 24mm; }
   .chip { display: inline-block; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.12); border-radius: 999px; padding: 2px 14px; font-size: 9pt; }
   .cover h1 { font-size: 30pt; margin: 14px 0 6px; line-height: 1.3; }
@@ -160,7 +163,6 @@
 <div class="sheet cover-sheet">
 <div class="cover" contenteditable="true" spellcheck="false">
   <div class="mark">
-    <div class="glyph"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
     <div class="logo">Audit Log Hub<small>Central audit-log platform</small></div>
   </div>
   <div class="body">

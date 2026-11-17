@@ -97,6 +97,8 @@ final class Labels
         'auth.account_locked' => 'قفل حساب',
         'role.assigned' => 'منح دور',
         'role.removed' => 'سحب دور',
+        'permission.granted' => 'منح صلاحيات',
+        'permission.revoked' => 'سحب صلاحيات',
         'user.mfa_reset' => 'تصفير المصادقة الثنائية',
         'user.unlocked' => 'فك قفل حساب',
         'api_key.created' => 'إنشاء مفتاح',
@@ -128,6 +130,12 @@ final class Labels
         'role' => 'دور',
         'backup_run' => 'عملية نسخ',
         'audit_log' => 'سجل',
+        // target_type values that are not models (PlatformAuditLogger::record with a string).
+        'configuration' => 'الإعدادات',
+        'users' => 'المستخدمون',
+        'backup' => 'النسخ الاحتياطي',
+        'audit_logs' => 'سجلات التدقيق',
+        'unknown_user' => 'مستخدم غير معروف',
     ];
 
     /** @var array<string, string> */

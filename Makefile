@@ -36,7 +36,8 @@ demo: ## Demo data for reviewers: 4 systems, ~800 logs, one account per role (de
 	$(APP) php artisan db:seed --class=DemoSeeder --force
 
 screenshots: ## Retake the product overview screenshots (needs `make up` + `make demo`; pulls the Playwright image once)
-	docker run --rm --network audit-log-platform_default -v "$(CURDIR)":/work -w /work mcr.microsoft.com/playwright/python:v1.49.1-noble python3 bin/screenshots
+	docker run --rm --network audit-log-platform_default -v "$(CURDIR)":/work -w /work -e PYTHONDONTWRITEBYTECODE=1 mcr.microsoft.com/playwright/python:v1.49.1-noble \
+		sh -c "pip install --quiet --disable-pip-version-check playwright==1.49.1 && python3 bin/screenshots"
 
 sso: ## SAML single sign-on with the development Keycloak (set SAML2_ENABLED=true in .env first)
 	@grep -q '^SAML2_ENABLED=true' .env || { echo "Set SAML2_ENABLED=true in .env first"; exit 1; }

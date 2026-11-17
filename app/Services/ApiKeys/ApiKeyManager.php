@@ -127,6 +127,9 @@ class ApiKeyManager
     {
         $ips = $this->validateIps($ips);
         $old = $key->allowed_ips;
+        if ($old === $ips) {
+            return; // nothing changed: no save, no audit record
+        }
         $key->forceFill(['allowed_ips' => $ips])->save();
 
         $this->audit->record('api_key.allowed_ips_updated', $key, ['old' => $old, 'new' => $ips], $by);

@@ -3,8 +3,12 @@
 namespace App\Filament\Resources\PlatformAudits\Schemas;
 
 use App\Filament\Support\Labels;
+use App\Filament\Support\PlatformAuditChanges;
+use App\Models\PlatformAudit;
+use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 
 class PlatformAuditInfolist
@@ -24,14 +28,32 @@ class PlatformAuditInfolist
                 TextEntry::make('user_agent')->label('المتصفح أو الجهاز')->columnSpanFull()
                     ->visible(fn ($record): bool => filled($record->user_agent)),
             ]),
-            Section::make('التغييرات')->columnSpanFull()
-                ->visible(fn ($record): bool => filled($record->changes))
+            // Before / after as a table (same view as the audit log diff).
+            Section::make('التغييرات (قبل / بعد)')->columnSpanFull()
+                ->visible(fn (PlatformAudit $record): bool => PlatformAuditChanges::diffRows($record->action, $record->changes) !== null)
                 ->schema([
-                    TextEntry::make('changes')->hiddenLabel()
-                        ->state(fn ($record) => $record->changes ? json_encode($record->changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null)
-                        ->fontFamily('mono')
-                        ->extraAttributes(['class' => 'whitespace-pre-wrap', 'dir' => 'ltr'])
-                        ->placeholder('—'),
+                    View::make('filament.value-diff')->viewData(fn (PlatformAudit $record): array => [
+                        'rows' => PlatformAuditChanges::diffRows($record->action, $record->changes) ?? [],
+                        'masked' => false,
+                    ]),
+                ]),
+
+            // Details of the action, or the full settings of a configuration
+            // record (expanded for the baseline, collapsed for a change).
+            Section::make(fn (PlatformAudit $record): string => PlatformAuditChanges::isConfig($record->action, $record->changes ?? [])
+                ? 'كل الإعدادات المسجلة' : 'التفاصيل')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(fn (PlatformAudit $record): bool => $record->action === 'config.changed')
+                ->visible(fn (PlatformAudit $record): bool => PlatformAuditChanges::isConfig($record->action, $record->changes ?? [])
+                    || (PlatformAuditChanges::diffRows($record->action, $record->changes) === null && filled($record->changes)))
+                ->schema([
+                    KeyValueEntry::make('changes')->hiddenLabel()
+                        ->keyLabel('البند')->valueLabel('القيمة')
+                        ->state(fn (PlatformAudit $record): array => PlatformAuditChanges::details($record->action, $record->changes))
+                        ->extraAttributes(fn (PlatformAudit $record): array => PlatformAuditChanges::isConfig($record->action, $record->changes ?? []) ? ['dir' => 'ltr'] : []),
+                    TextEntry::make('changes.hash')->label('بصمة الإعدادات (SHA-256)')->fontFamily('mono')
+                        ->visible(fn (PlatformAudit $record): bool => filled($record->changes['hash'] ?? null)),
                 ]),
         ]);
     }

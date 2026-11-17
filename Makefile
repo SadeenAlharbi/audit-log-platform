@@ -36,6 +36,7 @@ demo: ## Demo data for reviewers: 4 systems, ~800 logs, one account per role (de
 	$(APP) php artisan db:seed --class=DemoSeeder --force
 
 screenshots: ## Retake the product overview screenshots (needs `make up` + `make demo`; pulls the Playwright image once)
+	$(APP) php artisan cache:clear   # dashboard widgets cache their numbers for a few minutes
 	docker run --rm --network audit-log-platform_default -v "$(CURDIR)":/work -w /work -e PYTHONDONTWRITEBYTECODE=1 mcr.microsoft.com/playwright/python:v1.49.1-noble \
 		sh -c "pip install --quiet --disable-pip-version-check playwright==1.49.1 && python3 bin/screenshots"
 

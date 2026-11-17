@@ -15,7 +15,7 @@
     /* Integration guide (project page). */
     .alh-guide { display: grid; gap: 1rem; font-size: .875rem; min-width: 0; max-width: 100%; overflow: hidden; }
     .alh-guide > * { min-width: 0; }
-    .alh-guide-facts { display: grid; gap: .75rem 1.5rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+    .alh-guide-facts { display: grid; gap: .75rem 1.5rem; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
     .alh-guide-facts dt { color: var(--gray-500); font-weight: 500; margin-bottom: .25rem; }
     .alh-guide-facts dd { display: flex; flex-wrap: wrap; gap: .375rem; justify-content: flex-end; }
     .alh-guide-facts code { font-size: .75rem; padding: .125rem .375rem; border-radius: .375rem; background: var(--gray-100); overflow-wrap: anywhere; }

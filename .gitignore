@@ -43,3 +43,11 @@ docs/product/source/*.pdf
 # Owner's own working files next to the product document (not part of the repository).
 docs/product/source/product.html
 docs/product/source/img/roles.jpg
+
+# Owner's working documents: kept on the owner's machine, not part of the delivery (plan §15).
+/docs/product/
+/docs/acceptance-testing.md
+/docs/plan-compliance.md
+/docs/decisions.md
+/docs/schema.md
+/docs/reports/offsite-drill-*.md

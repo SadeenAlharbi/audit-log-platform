@@ -116,14 +116,9 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 | [docs/openapi.yaml](docs/openapi.yaml) | API contract (OpenAPI 3.1), served at `/docs/api` |
 | [docs/runbook.md](docs/runbook.md) | Operations: deployment, backups, full and per-project restore, key rotation, incidents |
 | [docs/permissions-matrix.md](docs/permissions-matrix.md) | Roles and permissions matrix (covered by automated tests) |
-| [docs/schema.md](docs/schema.md) · [database/schema/schema.sql](database/schema/schema.sql) · [docs/erd/erd.pdf](docs/erd/erd.pdf) | Schema, ERD (regenerate with `./bin/erd`) |
-| [docs/decisions.md](docs/decisions.md) | Technical decisions and their reasons |
+| [database/schema/schema.sql](database/schema/schema.sql) · [docs/erd/erd.pdf](docs/erd/erd.pdf) | Schema and ERD (regenerate with `./bin/erd`) |
 | [docs/security-review.md](docs/security-review.md) | Security review |
-| [docs/plan-compliance.md](docs/plan-compliance.md) | Every requirement of the plan, where it is implemented and how it is tested |
-| [docs/acceptance-testing.md](docs/acceptance-testing.md) | Manual acceptance test of every requirement from the dashboard (and the API with curl) |
-| [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | Product overview: purpose, roles, the life of a log, screens |
-| [docs/product/product-overview-template.html](docs/product/product-overview-template.html) | The same document as one editable file (Chrome/Edge: edit in place, Ctrl+P to PDF). Source: `docs/product/source/product-overview.html`, rebuilt with `make screenshots` (new screenshots) and `make product-doc` (PDF + template) |
-| [docs/reports/](docs/reports/) | Restore test, off-site drill and coverage reports |
+| [docs/reports/](docs/reports/) | Restore test and coverage reports |
 
 Most documents under `docs/` are written in Arabic.
 
@@ -151,7 +146,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Handover notes
 
-**Status (2026-11-17):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved; D20 sets the severity criteria the plan leaves open, D21 how every failed API attempt is recorded, D22 the dashboard time zone. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
+**Status (2026-11-17):** every requirement of the plan (v1.1) is implemented.
 
 ### Where things are
 
@@ -172,7 +167,6 @@ Most documents under `docs/` are written in Arabic.
 
 - Code, comments and commit messages in English; the dashboard and most documents in Arabic.
 - Every change comes with tests; `./bin/doctor` must end without errors before a push (tests, Pint, PHPStan, clock and off-site checks).
-- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D23).
 - `app/Filament/Auth/SetUpAppAuthenticationAction.php` is a copy of a Filament class with two changes (see its header): re-check it when upgrading Filament.
 
 ### Before production

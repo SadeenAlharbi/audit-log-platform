@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\AuditLog;
+use App\Models\BackupRun;
 use App\Models\Project;
+use App\Models\SecurityEvent;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoSeeder;
@@ -27,7 +29,11 @@ it('seeds an idempotent demo environment with one account per role', function ()
     expect($logs)->toBe(810)
         ->and(AuditLog::query()->withoutGlobalScopes()->count())->toBe(810)
         ->and(Project::query()->withoutGlobalScopes()->count())->toBe(4)
-        ->and(User::query()->where('email', 'like', '%@demo.test')->count())->toBe(5);
+        ->and(User::query()->where('email', 'like', '%@demo.test')->count())->toBe(5)
+        // Rejected attempts (with D21 summary rows) and backup history, seeded once.
+        ->and(SecurityEvent::query()->count())->toBe(16)
+        ->and(SecurityEvent::query()->get()->sum(fn ($e) => $e->request_meta['suppressed'] ?? 1))->toBe(14 + 412 + 168)
+        ->and(BackupRun::query()->count())->toBe(7);
 
     // The project viewer only sees the student-affairs system.
     $this->actingAs(User::query()->where('email', 'viewer@demo.test')->firstOrFail());

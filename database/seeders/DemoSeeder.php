@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\AuditLog;
+use App\Models\BackupRun;
 use App\Models\Project;
 use App\Models\ProjectApiKey;
+use App\Models\SecurityEvent;
 use App\Models\User;
 use App\Services\ApiKeys\ApiKeyManager;
 use Carbon\CarbonImmutable;
@@ -71,6 +73,98 @@ class DemoSeeder extends Seeder
             ['user.login', 'login', 'user', null, null],
         ]],
     ];
+
+    /**
+     * Rejected API requests for the "rejected attempts" page: one row per
+     * attempt, plus summary rows that stand for many attempts of the same
+     * minute (D21). Seeded once.
+     *
+     * @param  array<string, Project>  $projects
+     */
+    private function seedSecurityEvents(array $projects): void
+    {
+        if (SecurityEvent::query()->exists()) {
+            return;
+        }
+
+        $samples = [
+            // reason, project, ip, path, extra meta
+            ['invalid_key', 'hr', '185.220.101.14', '/api/v1/logs', ['key_prefix' => 'alh_x9Qe']],
+            ['invalid_key', 'hr', '185.220.101.14', '/api/v1/logs/batch', ['key_prefix' => 'alh_x9Qe']],
+            ['ip_not_allowed', 'hr', '10.40.3.77', '/api/v1/logs', []],
+            ['missing_signature', 'procurement', '10.20.8.15', '/api/v1/logs', []],
+            ['invalid_signature', 'procurement', '10.20.8.15', '/api/v1/logs/batch', []],
+            ['stale_timestamp', 'procurement', '10.20.8.16', '/api/v1/logs', []],
+            ['key_revoked', 'portal', '10.30.1.9', '/api/v1/logs', []],
+            ['key_expired', 'sis', '10.10.5.21', '/api/v1/logs', []],
+            ['project_mismatch', 'sis', '10.10.5.21', '/api/v1/logs', ['project_header' => 'hr']],
+            ['scope_denied', 'portal', '10.30.1.12', '/api/v1/logs', []],
+            ['missing_credentials', null, '94.102.49.193', '/api/v1/logs', []],
+            ['replayed_request', 'procurement', '10.20.8.15', '/api/v1/logs', []],
+            ['payload_too_large', 'sis', '10.10.5.30', '/api/v1/logs/batch', []],
+            ['https_required', 'portal', '10.30.1.9', '/api/v1/logs', []],
+        ];
+
+        $rows = [];
+        foreach ($samples as $i => [$reason, $slug, $ip, $path, $meta]) {
+            $project = $slug === null ? null : $projects[$slug] ?? null;
+            $rows[] = [
+                'project_id' => $project?->id,
+                'ip' => $ip,
+                'reason' => $reason,
+                'request_meta' => json_encode(['method' => 'POST', 'path' => $path, 'user_agent' => 'Mozilla/5.0 (demo)', ...$meta]),
+                'created_at' => CarbonImmutable::now('UTC')->subMinutes(15 + $i * 47)->format('Y-m-d H:i:s.v'),
+            ];
+        }
+
+        // Floods over the per-minute sample: one summary row each (D21).
+        foreach ([['missing_credentials', null, '94.102.49.193', 412, 95], ['rate_limited', 'portal', '10.30.1.12', 168, 300]] as [$reason, $slug, $ip, $count, $minutesAgo]) {
+            $minute = CarbonImmutable::now('UTC')->subMinutes($minutesAgo)->startOfMinute();
+            $rows[] = [
+                'project_id' => $slug === null ? null : $projects[$slug]->id,
+                'ip' => $ip,
+                'reason' => $reason,
+                'request_meta' => json_encode(['suppressed' => $count, 'window_start' => $minute->toIso8601String(), 'note' => 'attempts over the per-minute sample, counted not stored one by one']),
+                'created_at' => $minute->addMinute()->subMillisecond()->format('Y-m-d H:i:s.v'),
+            ];
+        }
+
+        DB::table('security_events')->insert($rows);
+    }
+
+    /** Backup, archive and restore-test history for the backups page. Seeded once. */
+    private function seedBackupRuns(): void
+    {
+        if (BackupRun::query()->exists()) {
+            return;
+        }
+
+        $now = CarbonImmutable::now('UTC');
+        $runs = [
+            ['full', 'succeeded', 1, 182_000_000, 'offsite:audit-backups/full/'],
+            ['incremental', 'succeeded', 0, 6_400_000, 'offsite:audit-backups/incremental/'],
+            ['binlog', 'succeeded', 0, 1_200_000, 'offsite:audit-backups/binlogs/'],
+            ['logs_archive', 'succeeded', 0, 2_300_000, 'archive:logs/'],
+            ['app_files', 'succeeded', 0, 450_000, 'offsite:audit-backups/app/'],
+            ['restore_test', 'succeeded', 3, null, null],
+            ['incremental', 'failed', 2, null, null],
+        ];
+
+        foreach ($runs as $i => [$type, $status, $daysAgo, $size, $location]) {
+            $started = $now->subDays($daysAgo)->subHours($i + 1);
+            BackupRun::query()->create([
+                'type' => $type,
+                'status' => $status,
+                'size' => $size,
+                'location' => $location,
+                'checksum' => $status === 'succeeded' && $size !== null ? hash('sha256', "demo-{$type}-{$i}") : null,
+                'meta' => ['demo' => true],
+                'started_at' => $started,
+                'finished_at' => $started->addMinutes($type === 'full' ? 6 : 1),
+                'error' => $status === 'failed' ? 'Upload to off-site storage timed out (demo)' : null,
+            ]);
+        }
+    }
 
     public function run(): void
     {
@@ -142,6 +236,9 @@ class DemoSeeder extends Seeder
                 ['role_id' => Role::findByName($role)->id, 'created_at' => now(), 'updated_at' => now()],
             );
         }
+
+        $this->seedSecurityEvents($projects);
+        $this->seedBackupRuns();
 
         $this->command->info('Demo ready: 4 systems, accounts *@demo.test (admin, auditor, security, owner, viewer), password: DEMO_PASSWORD or '.self::PASSWORD);
     }

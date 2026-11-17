@@ -53,8 +53,8 @@ cp .env.docker.example .env
 ```bash
 dc build
 dc up -d
-dc exec app php artisan migrate --seed --force
-dc exec app php artisan audit:partitions
+dc exec scheduler php artisan migrate --seed --force   # ليس app: حاوية الويب لا تملك كلمة مرور حساب الصيانة
+dc exec scheduler php artisan audit:partitions
 dc ps            # كل الخدمات healthy
 ```
 
@@ -74,7 +74,7 @@ grep 'public key' backup-age-identity.txt    # تضعه في BACKUP_AGE_RECIPIEN
 | الحساب | الصلاحيات | يستخدمه |
 |---|---|---|
 | `audit_app` (`DB_USERNAME`) | `SELECT, INSERT, UPDATE, DELETE` فقط. بدون `ALTER` أو `DROP` أو `TRIGGER`، فلا يستطيع تعطيل الـ Triggers ولا `TRUNCATE` ولا حذف قسم | التطبيق والطوابير |
-| `audit_maintenance` (`DB_MAINTENANCE_USERNAME`) | كل الصلاحيات على قاعدة التطبيق | `migrate` (تلقائيًا: أوامر الـ schema تعمل على اتصال `maintenance`)، وإنشاء وحذف الأقسام في `audit:partitions` و`audit:prune` |
+| `audit_maintenance` (`DB_MAINTENANCE_USERNAME`) | كل الصلاحيات على قاعدة التطبيق | `migrate` (تلقائيًا: أوامر الـ schema تعمل على اتصال `maintenance`)، وإنشاء وحذف الأقسام في `audit:partitions` و`audit:prune`. في الإنتاج كلمة مروره موجودة في `scheduler` و`queue-worker` فقط، لا في حاوية الويب `app` |
 | `audit_archiver` | `SELECT, DELETE`، والـ Trigger لا يسمح بالحذف لغيره | الحذف حسب مدة الاحتفاظ |
 | `audit_backup` | `RELOAD, PROCESS, LOCK TABLES, BINLOG MONITOR` + قراءة | mariadb-backup |
 
@@ -90,7 +90,7 @@ grep 'public key' backup-age-identity.txt    # تضعه في BACKUP_AGE_RECIPIEN
 git pull
 dc build
 dc up -d                                     # Horizon يُنهي الـ jobs الجارية خلال 60 ثانية
-dc exec app php artisan migrate --force      # بعد أول نشر: Migrations إضافية قابلة للتراجع فقط
+dc exec scheduler php artisan migrate --force   # بعد أول نشر: Migrations إضافية قابلة للتراجع فقط
 dc exec app php artisan horizon:terminate
 ```
 
@@ -140,7 +140,7 @@ dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ
 
 ## 2. ما يعمل تلقائيًا
 
-| المهمة | التوقيت (UTC) | أين |
+| المهمة | التوقيت (UTC؛ +3 بتوقيت الرياض) | أين |
 |---|---|---|
 | تجهيز أقسام الأشهر القادمة (`audit:partitions`) | يوميًا 01:10 | scheduler |
 | الأرشيف اليومي Write-Ahead (`audit:archive`، D19) | يوميًا 01:30 UTC | scheduler |
@@ -155,6 +155,8 @@ dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ
 | تقرير الصلاحيات الحساسة | شهريًا | scheduler |
 | مراجعة الصلاحيات الكاملة | كل 3 أشهر | scheduler |
 | مراقبة تراكم الطوابير | كل 5 دقائق | scheduler + Horizon |
+| كتابة المحاولات المرفوضة المعدودة كصف ملخص (`audit:flush-security-events`، D21) | كل دقيقة | scheduler |
+| سجلات مقبولة لم تصل للقاعدة (`audit:check-ingestion`) | كل 15 دقيقة | scheduler |
 
 كل عملية نسخ أو أرشفة أو استعادة تُسجَّل في `backup_runs`، وتظهر في **اللوحة ← التشغيل ← النسخ الاحتياطي** مع زر التشغيل اليدوي.
 
@@ -210,7 +212,7 @@ dc exec app php artisan audit:saml-sync    # يقرأ الـ metadata ويحفظ
    dc up -d
    ```
 7. تحقق:
-   - `dc exec app php artisan audit:partitions`.
+   - `dc exec scheduler php artisan audit:partitions`.
    - عدد السجلات مقارنةً بآخر `max_audit_id` في `backup_runs.meta`.
    - `curl https://audit.example.com/api/v1/health`.
 8. سجّل الاستعادة (الخطة §12: كل استعادة تُسجَّل في `backup_runs` و`platform_audit`):
@@ -310,6 +312,7 @@ make offsite-drill
 | **Restore test failed** | نسخة تالفة أو سلسلة ناقصة | خذ full جديدة فورًا، وراجع التقرير |
 | **Queue backlog / wait time too long** | Horizon متوقف أو القاعدة بطيئة | `/horizon`، ثم `dc logs queue-worker`، ثم `dc restart queue-worker` |
 | **Audit logs could not be stored** | Job فشل بعد 5 محاولات | أصلح السبب (القاعدة، أو قسم مفقود)، ثم `dc exec app php artisan queue:retry all`. السجلات محفوظة في `failed_jobs` ولا تضيع |
+| **Accepted audit logs are missing** | سجلات رُد عليها بـ 202 ولم تُخزَّن بعد 30 دقيقة: Job ضاع (توقف Redis قبل حفظ الطابور على القرص، أو حُذف من `failed_jobs`)، أو الطابور متوقف | `dc exec app php artisan audit:check-ingestion` يعرض المشاريع والأعداد. ثم `queue:failed` و`/horizon`، و`queue:retry all` إن كانت في `failed_jobs`. إن ضاعت فعلًا: اطلب من النظام المرسل إعادة إرسالها بـ `external_id` جديد (القديم محجوز) |
 | **Repeated rejected API requests** | مفتاح مسرّب، أو نظام مضبوط خطأ، أو هجوم | «المحاولات المرفوضة»: حدّد العنوان والسبب. ألغِ المفتاح، أو أضف قائمة IP، أو احجب العنوان في الـ proxy |
 | حساب مقفل (رسالة «الحساب مقفل مؤقتًا» عند الدخول) | 5 محاولات دخول خاطئة | ينفك وحده بعد 15 دقيقة، أو «المستخدمون ← فك القفل»، أو إن كان مدير المنصة الوحيد: `dc exec app php artisan audit:unlock-user <email>` |
 

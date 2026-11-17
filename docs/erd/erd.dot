@@ -1,5 +1,5 @@
 digraph ERD {
-    graph [rankdir=LR, splines=spline, nodesep=0.35, ranksep=0.9, newrank=true, pad=0.4, bgcolor="white",
+    graph [rankdir=LR, splines=ortho, nodesep=0.35, ranksep=0.9, newrank=true, pad=0.4, bgcolor="white",
            fontname="IBM Plex Sans Arabic,DejaVu Sans,sans-serif", fontsize=22, labelloc=t, labeljust=l,
            label=<<B>Audit Log Hub — ERD</B><BR/><FONT POINT-SIZE="12" COLOR="#6b7280">Generated from database/schema/schema.sql by bin/erd. Solid: foreign key · Dashed: logical reference without FK (partitioned table / polymorphic) · → users.id: who did it (created_by, revoked_by, ...)</FONT>>];
     node [shape=plaintext, fontname="IBM Plex Sans Arabic,DejaVu Sans,sans-serif", fontsize=11];

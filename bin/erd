@@ -9,7 +9,8 @@ Writes, in docs/erd/:
   erd.mmd  Mermaid source (GitHub renders it in Markdown).
   erd.svg / erd.pdf / erd.png when Graphviz (`dot`) is installed.
 
-Solid lines are foreign keys. Dashed lines are logical references without a
+Lines are straight, with right angles only (splines=ortho). Solid lines are
+foreign keys. Dashed lines are logical references without a
 foreign key: audit_logs is partitioned, and MariaDB does not allow foreign
 keys on partitioned tables (decision D1); spatie's model_has_* tables are
 polymorphic. The "who did it" references to users (created_by, revoked_by,
@@ -139,7 +140,7 @@ def actor_notes(t) -> dict:
 def graphviz(tables) -> str:
     out = [
         "digraph ERD {",
-        '    graph [rankdir=LR, splines=spline, nodesep=0.35, ranksep=0.9, newrank=true, pad=0.4, bgcolor="white",',
+        '    graph [rankdir=LR, splines=ortho, nodesep=0.35, ranksep=0.9, newrank=true, pad=0.4, bgcolor="white",',
         f'           fontname="{FONT}", fontsize=22, labelloc=t, labeljust=l,',
         '           label=<<B>Audit Log Hub — ERD</B><BR/><FONT POINT-SIZE="12" COLOR="#6b7280">'
         "Generated from database/schema/schema.sql by bin/erd. "

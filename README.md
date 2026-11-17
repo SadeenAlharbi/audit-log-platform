@@ -150,7 +150,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Handover notes
 
-**Status (2026-11-16):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved; D20 sets the severity criteria the plan leaves open. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
+**Status (2026-11-17):** every requirement of the plan (v1.1) is implemented; two are met by a documented equivalent (decisions D7 and D19). The schema and decisions D1–D19 are approved; D20 sets the severity criteria the plan leaves open, D21 how every failed API attempt is recorded, D22 the dashboard time zone. Details: [docs/plan-compliance.md](docs/plan-compliance.md).
 
 ### Where things are
 
@@ -171,7 +171,7 @@ Most documents under `docs/` are written in Arabic.
 
 - Code, comments and commit messages in English; the dashboard and most documents in Arabic.
 - Every change comes with tests; `./bin/doctor` must end without errors before a push (tests, Pint, PHPStan, clock and off-site checks).
-- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D21).
+- Decisions that change what the plan asks for go in `docs/decisions.md` (next number D23).
 - `app/Filament/Auth/SetUpAppAuthenticationAction.php` is a copy of a Filament class with two changes (see its header): re-check it when upgrading Filament.
 
 ### Before production
@@ -184,6 +184,6 @@ Most documents under `docs/` are written in Arabic.
 ### Known limits
 
 - Free-text values are not scanned for personal data; only known keys are masked ([docs/security-review.md](docs/security-review.md)).
-- "Logs today" on the dashboard counts by UTC day.
+- Storage, the API, exports and the archive are in UTC; only the dashboard shows local time (`AUDIT_DISPLAY_TIMEZONE`, default `Asia/Riyadh`, D22). The archive-restore dialog takes UTC days.
 - On Linux hosts, `storage/` must be writable by the container user (uid 33); macOS and Windows need nothing.
 

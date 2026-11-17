@@ -32,6 +32,8 @@
 | L2 | Low | المصادقة الثنائية كانت لدورين فقط، وPlatform Auditor يقرأ كل المشاريع بدونها | إلزامية لكل دور على مستوى المنصة، ولكل من يملك `logs.view_sensitive` | `RoleMatrixTest` |
 | L3 | Low | HTTPS للوحة غير مفروض | `forceScheme('https')` في الإنتاج + `SESSION_SECURE_COOKIE` + HSTS على الـ proxy | Runbook §1.2 |
 | L4 | Low | `TRUSTED_PROXIES=*` يسمح بتزوير IP لتجاوز قائمة IP | الـ Runbook يشترط عناوين محددة. في الإنتاج nginx على 127.0.0.1 فقط | Runbook §1.2 |
+| H3 (2026-11-17) | High | في الإنتاج، حاوية الويب `app` كانت تأخذ كلمة مرور حساب الصيانة من `.env`، فثغرة في الويب تعطي ALTER/DROP/TRIGGER وتلغي حماية H1 | `DB_MAINTENANCE_PASSWORD` فارغ في `app`، والـ Migrations من `scheduler` | `docker-compose.prod.yml`، Runbook §1.2 و§1.5 |
+| L5 (2026-11-17) | Low | `backup.sh` يمرر كلمة مرور حساب النسخ في سطر الأوامر، فتظهر في `ps` داخل الحاوية | ملف خيارات مؤقت بصلاحية 600 يُحذف عند الخروج | تشغيل `make backup-full` |
 
 ## ملاحظات صغيرة (للعلم)
 

@@ -35,6 +35,9 @@ seed: ## Run the (idempotent) seeders
 demo: ## Demo data for reviewers: 4 systems, ~800 logs, one account per role (dev only)
 	$(APP) php artisan db:seed --class=DemoSeeder --force
 
+screenshots: ## Retake the product overview screenshots (needs `make up` + `make demo`; pulls the Playwright image once)
+	docker run --rm --network audit-log-platform_default -v "$(CURDIR)":/work -w /work mcr.microsoft.com/playwright/python:v1.49.1-noble python3 bin/screenshots
+
 sso: ## SAML single sign-on with the development Keycloak (set SAML2_ENABLED=true in .env first)
 	@grep -q '^SAML2_ENABLED=true' .env || { echo "Set SAML2_ENABLED=true in .env first"; exit 1; }
 	$(COMPOSE) --profile sso up -d
@@ -71,4 +74,4 @@ doctor: ## Run every check and save the report to storage/logs/doctor.log
 backup-full: ## Take a full database backup now
 	$(COMPOSE) run --rm backup full
 
-.PHONY: help setup up down ps logs shell migrate fresh seed demo partitions test lint analyse openapi-lint schema-dump doctor backup-full
+.PHONY: help setup up down ps logs shell migrate fresh seed demo screenshots partitions test lint analyse openapi-lint schema-dump doctor backup-full

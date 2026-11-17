@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Take the dashboard screenshots used in the product overview.
+
+Runs a headless Chromium (official Playwright image) on the compose network,
+signs in with the demo list (APP_ENV=local, demo data from `make demo`) and
+writes docs/product/source/img/*.jpg. Then rebuild the document:
+`python3 docs/product/source/render.py`.
+
+    make screenshots          # or the docker command in the Makefile
+
+"localhost" is mapped to the nginx container, so the demo sign-in sees a local
+host exactly as in a browser on the developer's machine.
+"""
+import pathlib
+import sys
+
+from playwright.sync_api import sync_playwright
+
+BASE = "http://localhost"
+OUT = pathlib.Path(__file__).resolve().parent.parent / "docs/product/source/img"
+SIZE = {"width": 1600, "height": 1000}
+
+
+def wait(page):
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(1200)  # charts and Livewire finish drawing
+
+
+def shot(page, name, path):
+    page.goto(BASE + path)
+    wait(page)
+    page.screenshot(path=str(OUT / f"{name}.jpg"), type="jpeg", quality=88)
+    print("saved", name)
+
+
+def main() -> int:
+    OUT.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--host-resolver-rules=MAP localhost nginx"])
+        page = browser.new_context(viewport=SIZE, locale="ar-SA", timezone_id="Asia/Riyadh").new_page()
+
+        # Sign-in form, without the demo list (it exists only in development).
+        page.goto(BASE + "/admin/login")
+        wait(page)
+        page.evaluate("document.querySelectorAll('.alh-demo').forEach(e => e.style.display = 'none')")
+        page.set_viewport_size({"width": 700, "height": 700})
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(OUT / "login.jpg"), type="jpeg", quality=88)
+        print("saved login")
+        page.set_viewport_size(SIZE)
+
+        # Demo sign-in as the platform admin.
+        page.evaluate("document.querySelectorAll('.alh-demo').forEach(e => e.style.display = '')")
+        page.get_by_text("admin@demo.test").click()
+        page.wait_for_url("**/admin", timeout=20000)
+
+        shot(page, "dashboard", "/admin")
+        shot(page, "logs", "/admin/audit-logs")
+
+        # First log of the list, read-only detail page.
+        page.locator("table tbody tr").first.click()
+        page.wait_for_url("**/admin/audit-logs/*", timeout=20000)
+        wait(page)
+        page.screenshot(path=str(OUT / "log-view-uid.jpg"), type="jpeg", quality=88)
+        print("saved log-view-uid")
+
+        # Project page of the HR demo system.
+        page.goto(BASE + "/admin/projects")
+        wait(page)
+        page.get_by_text("نظام الموارد البشرية").first.click()
+        page.wait_for_url("**/admin/projects/*", timeout=20000)
+        wait(page)
+        page.screenshot(path=str(OUT / "project-view.jpg"), type="jpeg", quality=88)
+        print("saved project-view")
+
+        shot(page, "security", "/admin/security-events")
+        shot(page, "backups", "/admin/backup-runs")
+        browser.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

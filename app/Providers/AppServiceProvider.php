@@ -57,11 +57,12 @@ class AppServiceProvider extends ServiceProvider
         Table::configureUsing(fn (Table $table) => $table
             ->defaultNumberLocale('en')
             // "Apply filters" also closes the filters dropdown (Filament keeps
-            // it open). close() is the dropdown's own Alpine method; the guard
-            // keeps it from running anywhere else.
-            ->filtersApplyAction(fn (Action $action) => $action->extraAttributes([
-                'x-on:click' => "\$el.closest('.fi-dropdown') && close()",
-            ], merge: true)));
+            // it open). The Alpine handler replaces Livewire's wire:click, so it
+            // calls applyTableFilters itself, then the dropdown's own close();
+            // the guard keeps close() from running outside a dropdown.
+            ->filtersApplyAction(fn (Action $action) => $action->alpineClickHandler(
+                "\$wire.applyTableFilters(); \$el.closest('.fi-dropdown') && close()",
+            )));
         Schema::configureUsing(fn (Schema $schema) => $schema->defaultNumberLocale('en'));
 
         // Times in the dashboard (columns, entries, date pickers) are shown in

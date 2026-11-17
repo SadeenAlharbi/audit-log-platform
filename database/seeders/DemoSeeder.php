@@ -189,15 +189,18 @@ class DemoSeeder extends Seeder
             }
 
             // Logs are append-only, so a second run never re-seeds: it only tops
-            // up the time since the last demo log, at the same daily rate, so the
+            // up the time since the previous run, at the same daily rate, so the
             // dashboard ("today", "last 24 hours") is not empty on a later day.
+            // The previous run is the writer key's last use (set below), or the
+            // newest log if that is later.
             $now = CarbonImmutable::now('UTC');
             $existing = AuditLog::query()->withoutGlobalScopes()->where('project_id', $project->id);
+            $writer = DB::table('project_api_keys')->where('project_id', $project->id)->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE);
             $seeded = (clone $existing)->count();
-            $latest = (clone $existing)->max('occurred_at');
-            $from = $latest === null ? $now->subDays(13) : CarbonImmutable::parse((string) $latest, 'UTC');
+            $latest = max((string) (clone $existing)->max('occurred_at'), (string) (clone $writer)->max('last_used_at'));
+            $from = $latest === '' ? $now->subDays(13) : CarbonImmutable::parse($latest, 'UTC');
             $span = max(0, $now->getTimestamp() - 120 - $from->getTimestamp());
-            $add = $latest === null ? $count : (int) round($count / 13 * $span / 86400);
+            $add = $latest === '' ? $count : (int) round($count / 13 * $span / 86400);
             if ($add === 0 || $span < 3600) {
                 continue;
             }
@@ -234,9 +237,9 @@ class DemoSeeder extends Seeder
                 DB::table('audit_logs')->insert($chunk);
             }
 
-            // The writer key "received" the newest log ("last received" on the dashboard).
-            DB::table('project_api_keys')->where('project_id', $project->id)->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE)
-                ->update(['last_used_at' => substr((string) AuditLog::query()->withoutGlobalScopes()->where('project_id', $project->id)->max('received_at'), 0, 19)]);
+            // The writer key "sent" the logs of this run: "last received" on the
+            // dashboard, and where the next run continues from.
+            (clone $writer)->update(['last_used_at' => $now->format('Y-m-d H:i:s')]);
         }
 
         foreach (self::ACCOUNTS as [$email, $name, $role, $projectSlug]) {

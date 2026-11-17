@@ -122,6 +122,7 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 | [docs/plan-compliance.md](docs/plan-compliance.md) | Every requirement of the plan, where it is implemented and how it is tested |
 | [docs/acceptance-testing.md](docs/acceptance-testing.md) | Manual acceptance test of every requirement from the dashboard (and the API with curl) |
 | [docs/product/product-overview.pdf](docs/product/product-overview.pdf) | Product overview: purpose, roles, the life of a log, screens |
+| [docs/product/product-overview-template.html](docs/product/product-overview-template.html) | The same document as one editable file (Chrome/Edge: edit in place, Ctrl+P to PDF). Source: `docs/product/source/product-overview.html`, built by `python3 render.py` |
 | [docs/reports/](docs/reports/) | Restore test, off-site drill and coverage reports |
 
 Most documents under `docs/` are written in Arabic.

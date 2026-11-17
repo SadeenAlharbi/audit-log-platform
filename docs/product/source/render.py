@@ -1,23 +1,59 @@
-from playwright.sync_api import sync_playwright
+"""Build the product overview from product-overview.html (the single source).
+
+    python3 render.py
+
+Writes:
+  ../product-overview.pdf             the PDF (Chromium print: A4, header band and page numbers from @page)
+  ../product-overview-template.html   one self-contained file (images and fonts embedded) to edit in the
+                                      browser and export with Ctrl+P -> Save as PDF
+
+Needs: pip install playwright pypdf && playwright install chromium
+"""
+import base64
 import pathlib
-html = pathlib.Path('body.html').resolve().as_uri()
-footer = '''<div style="width:100%;font-size:7.5pt;color:#6C737F;padding:0 16mm;display:flex;justify-content:space-between;direction:rtl;font-family:'IBM Plex Sans Arabic'">
-<span>منصة سجلات التدقيق المركزية · Audit Log Hub</span><span>صفحة <span class="pageNumber"></span> / <span class="totalPages"></span></span></div>'''
-header = '''<div style="width:100%;height:12mm;margin-top:-4mm;background:linear-gradient(90deg,#14573A,#1B8354);-webkit-print-color-adjust:exact;color:#fff;font-size:8pt;display:flex;align-items:center;justify-content:space-between;padding:0 16mm;direction:rtl;font-family:'IBM Plex Sans Arabic'">
-<span>وثيقة تعريف المنتج — منصة سجلات التدقيق المركزية</span><span style="direction:ltr">Audit Log Hub</span></div>'''
-with sync_playwright() as p:
-    b = p.chromium.launch(); pg = b.new_page()
-    pg.goto(html); pg.wait_for_load_state('networkidle')
-    pg.pdf(path='product-overview.pdf', format='A4', print_background=True, display_header_footer=True,
-           header_template=header, footer_template=footer, margin={'top':'24mm','bottom':'18mm','left':'16mm','right':'16mm'})
-    pg2 = b.new_page(); pg2.goto(pathlib.Path('cover.html').resolve().as_uri()); pg2.wait_for_load_state('networkidle')
-    pg2.pdf(path='cover.pdf', width='210mm', height='297mm', print_background=True, margin={'top':'0','bottom':'0','left':'0','right':'0'})
-    b.close()
-from pypdf import PdfWriter
-w = PdfWriter()
-for f in ('cover.pdf', 'product-overview.pdf'):
-    w.append(f)
-w.add_metadata({'/Title': 'وثيقة تعريف المنتج — منصة سجلات التدقيق المركزية', '/Author': 'سدين الحربي'})
-with open('final.pdf', 'wb') as fh:
-    w.write(fh)
-print('ok')
+import re
+
+from playwright.sync_api import sync_playwright
+from pypdf import PdfReader, PdfWriter
+
+HERE = pathlib.Path(__file__).resolve().parent
+SRC = HERE / "product-overview.html"
+OUT = HERE.parent
+TITLE = "وثيقة تعريف المنتج — منصة سجلات التدقيق المركزية"
+MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".woff2": "font/woff2"}
+
+
+def standalone(html: str) -> str:
+    """Inline every relative img/ and fonts/ reference as a data: URI."""
+    def inline(match: re.Match) -> str:
+        path = HERE / match.group(2)
+        data = base64.b64encode(path.read_bytes()).decode()
+        return f'{match.group(1)}data:{MIME[path.suffix.lower()]};base64,{data}{match.group(3)}'
+
+    return re.sub(r'((?:src=|url\()")((?:img|fonts)/[^"]+)(")', inline, html)
+
+
+def main() -> None:
+    template = OUT / "product-overview-template.html"
+    template.write_text(standalone(SRC.read_text(encoding="utf-8")), encoding="utf-8")
+
+    pdf = OUT / "product-overview.pdf"
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(SRC.as_uri())
+        page.wait_for_load_state("networkidle")
+        page.evaluate("document.fonts.ready")
+        page.pdf(path=str(pdf), prefer_css_page_size=True, print_background=True)
+        browser.close()
+
+    writer = PdfWriter(clone_from=PdfReader(pdf))
+    writer.add_metadata({"/Title": TITLE, "/Author": "سدين الحربي"})
+    with open(pdf, "wb") as fh:
+        writer.write(fh)
+    print(f"{pdf.relative_to(OUT.parent.parent)}: {len(writer.pages)} pages")
+    print(f"{template.relative_to(OUT.parent.parent)}")
+
+
+if __name__ == "__main__":
+    main()

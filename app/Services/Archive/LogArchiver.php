@@ -13,8 +13,11 @@ use Throwable;
  * copied to S3/MinIO as gzip-compressed JSONL, independently of the database
  * backups, so the table can be rebuilt even if the database is lost.
  *
- *   logs/{project_slug}/{YYYY}/{MM}/{DD}/{firstId}-{lastId}.jsonl.gz
- *   logs/{project_slug}/{YYYY}/{MM}/{DD}/{firstId}-{lastId}.json   (manifest)
+ * Monthly (plan §12): a run archives only complete calendar months (UTC) of
+ * created_at, filed under the month the logs were stored in:
+ *
+ *   logs/{project_slug}/{YYYY}/{MM}/{firstId}-{lastId}.jsonl.gz
+ *   logs/{project_slug}/{YYYY}/{MM}/{firstId}-{lastId}.json   (manifest)
  *
  * Progress is a watermark on audit_logs.id (AUTO_INCREMENT, monotonic),
  * stored in backup_runs.meta.last_id of the last successful run. Retention
@@ -66,7 +69,7 @@ class LogArchiver
     public function run(?int $maxRows = null): array
     {
         $from = self::watermark();
-        $settled = now()->utc()->subSeconds((int) config('audit.archive.settle_seconds', 120))->format('Y-m-d H:i:s.v');
+        $settled = self::cutoff();
 
         // Nothing new: no run is recorded (a no-op run would otherwise
         // fill the Backups page) and the watermark stays where it is.
@@ -104,12 +107,13 @@ class LogArchiver
                     break;
                 }
 
-                foreach ($batch->groupBy('project_id') as $projectId => $logs) {
+                // One file per project and month of a chunk (a chunk can span months when catching up).
+                foreach ($batch->groupBy(fn ($row) => $row->project_id.'|'.substr((string) $row->created_at, 0, 7)) as $group => $logs) {
+                    [$projectId, $month] = explode('|', (string) $group, 2);
                     $first = $logs->first();
                     $last = $logs->last();
                     $slug = $slugs[$projectId] ?? 'project-'.$projectId;
-                    $day = substr((string) $first->created_at, 0, 10);
-                    $base = sprintf('logs/%s/%s/%s-%s', $slug, str_replace('-', '/', $day), $first->id, $last->id);
+                    $base = sprintf('logs/%s/%s/%s-%s', $slug, str_replace('-', '/', $month), $first->id, $last->id);
 
                     $jsonl = $logs->map(fn ($row) => json_encode(self::encodeRow($row), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))->implode("\n")."\n";
                     $gz = gzencode($jsonl, 6);
@@ -154,6 +158,19 @@ class LogArchiver
         }
 
         return ['files' => $files, 'rows' => $rows, 'last_id' => $lastId];
+    }
+
+    /**
+     * Rows stored before this moment are archived: the start of the current
+     * month (UTC). In the first settle_seconds of a month it is settle_seconds
+     * ago instead, so rows still being committed are left for the next run.
+     */
+    public static function cutoff(): string
+    {
+        $monthStart = now()->utc()->startOfMonth();
+        $settled = now()->utc()->subSeconds((int) config('audit.archive.settle_seconds', 120));
+
+        return ($settled->lessThan($monthStart) ? $settled : $monthStart)->format('Y-m-d H:i:s.v');
     }
 
     /**

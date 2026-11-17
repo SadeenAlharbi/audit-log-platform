@@ -100,7 +100,7 @@ Full details: [docs/integration-guide.md](docs/integration-guide.md). API contra
 - **Immutability:** database triggers reject every `UPDATE` and `DELETE` on `audit_logs`; only the archiver account may delete, and only after the data is archived.
 - **Isolation:** every query is scoped to the projects the user or API key may access.
 - **Sensitive data:** credentials (passwords, tokens, card numbers) are removed before storage; personal data is masked on display unless the viewer has the "view sensitive data" permission.
-- **Retention:** monthly partitions; logs are archived daily as compressed JSONL (one file per project per day), kept for a grace period, then deleted according to each project's retention.
+- **Retention:** monthly partitions; logs are archived monthly as compressed JSONL (plan §12: on the 1st, the month that ended, one folder per project and month), kept for a grace period, then deleted according to each project's retention.
 - **Backups:** daily full, hourly incremental and binary logs (RPO 1 hour), encrypted, copied off-site and checked byte for byte, with a weekly automated restore test and a quarterly drill from the off-site copy (`make offsite-drill`).
 - **Self-audit:** sign-ins, role and key changes, exports, backups and every change of the `.env` settings (`audit:config-check`) are recorded in the immutable `platform_audit` table.
 - **Dashboard roles:** Super Admin, Platform Auditor, Security Officer, Project Owner, Project Viewer, plus custom roles. Two-factor authentication is mandatory for platform-wide roles.
@@ -126,7 +126,7 @@ Most documents under `docs/` are written in Arabic.
 
 ## Quality
 
-- **Pest:** 231 tests (885 assertions) against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
+- **Pest:** 233 tests (894 assertions) against a real MariaDB (partitioning and triggers need the real engine), including SAML sign-ins with real signed responses.
 - **Coverage:** at least 80% for the API layer, enforced in CI by `bin/coverage-api` (95.3% on 2026-11-16, [report](docs/reports/coverage-2026-11-16.md)).
 - **Pint + PHPStan level 6:** no errors.
 - **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every check inside Docker, builds the production images and lints the OpenAPI file.

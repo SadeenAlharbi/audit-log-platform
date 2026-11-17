@@ -41,17 +41,18 @@ class BackupStatus
     }
 
     /**
-     * The archiver records no run when there is nothing new, so an old
-     * last run is only late if logs older than 26 hours are still waiting.
+     * Monthly archive (plan §12): it is late when logs of a month that ended
+     * more than 26 hours ago are still not archived. The archiver records no
+     * run when there is nothing new, so an old last run alone is not late.
      *
      * @return array{label: string, value: string, ok: bool, last: ?Carbon}
      */
     private function archiveItem(): array
     {
-        $item = $this->item('آخر أرشفة للسجلات', 'logs_archive', now()->subHours(26)); // daily run (D19) + margin
+        $item = $this->item('آخر أرشفة للسجلات', 'logs_archive', now()->subDays(32)); // monthly run + margin
         if (! $item['ok'] && ! str_contains($item['value'], '(آخر محاولة فشلت)')) {
             $pending = DB::table('audit_logs')->where('id', '>', LogArchiver::watermark())
-                ->where('created_at', '<', now()->utc()->subHours(26))->exists();
+                ->where('created_at', '<', now()->utc()->subHours(26)->startOfMonth())->exists();
             if (! $pending) {
                 $item['ok'] = true;
                 $item['value'] = $item['last'] ? $item['last']->diffForHumans().' (لا جديد بعدها)' : 'لا توجد سجلات للأرشفة';

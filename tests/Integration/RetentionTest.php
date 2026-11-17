@@ -13,14 +13,31 @@ beforeEach(function () {
     config(['audit.archive.settle_seconds' => 0, 'audit.archive.grace_days' => 0]);
 });
 
+/**
+ * An expired log: occurred and stored in a complete earlier month, so the
+ * monthly archive (plan §12) takes it and the 7-day retention has passed.
+ *
+ * @param  array<string, mixed>  $overrides
+ */
+function expiredLog(Project $project, array $overrides = []): AuditLog
+{
+    $at = CarbonImmutable::now('UTC')->startOfMonth()->subDays(20);
+    // A project cannot store logs before it exists (the archive restore only
+    // looks from the project's creation on).
+    if ($project->created_at === null || $project->created_at->greaterThan($at)) {
+        $project->forceFill(['created_at' => $at->subDay()])->saveQuietly();
+    }
+
+    return makeAuditLog($project, ['occurred_at' => $at, 'created_at' => $at, ...$overrides]);
+}
+
 it('archives then deletes logs older than the project retention through the archiver account', function () {
     $short = Project::factory()->create(['retention_days' => 7]);
     $long = Project::factory()->create(['retention_days' => 365]);
 
-    $old = now()->utc()->subDays(20);
-    makeAuditLog($short, ['occurred_at' => $old]);
+    expiredLog($short);
     makeAuditLog($short, ['occurred_at' => now()]);
-    makeAuditLog($long, ['occurred_at' => $old]);
+    expiredLog($long);
 
     $this->artisan('audit:prune')->assertSuccessful();
 
@@ -31,17 +48,30 @@ it('archives then deletes logs older than the project retention through the arch
 
 it('never deletes rows that are not archived yet', function () {
     $project = Project::factory()->create(['retention_days' => 7]);
-    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+    expiredLog($project);
 
     $this->artisan('audit:prune --skip-archive')->assertSuccessful();
 
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
 });
 
+it('keeps expired rows of the current month until the monthly archive has taken them', function () {
+    // Received this month with an old occurred_at (a late client): not archived yet, so not deleted.
+    if (CarbonImmutable::now('UTC')->day === 1) {
+        $this->travelTo(CarbonImmutable::now('UTC')->addDay());
+    }
+    $project = Project::factory()->create(['retention_days' => 7]);
+    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+
+    $this->artisan('audit:prune')->assertSuccessful();
+
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1);
+});
+
 it('keeps idempotency keys while their log rows still exist', function () {
     $project = Project::factory()->create(['retention_days' => 7]);
-    $old = now()->utc()->subDays(20);
-    $log = makeAuditLog($project, ['occurred_at' => $old, 'external_id' => 'kept']);
+    $log = expiredLog($project, ['external_id' => 'kept']);
+    $old = CarbonImmutable::instance($log->occurred_at);
     DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'kept', 'log_uid' => $log->uid, 'occurred_at' => $old->format('Y-m-d H:i:s.v'), 'created_at' => $old->format('Y-m-d H:i:s.v')]);
 
     // Not archived yet: the row stays, and so must its key.
@@ -60,7 +90,7 @@ it('drops monthly partitions older than the platform maximum', function () {
     config(['audit.retention.max_days' => 1]);
     $project = Project::factory()->create(['retention_days' => 1]);
     $lastMonth = CarbonImmutable::now('UTC')->startOfMonth()->subMonth()->addDays(2);
-    makeAuditLog($project, ['occurred_at' => $lastMonth, 'external_id' => 'k1']);
+    makeAuditLog($project, ['occurred_at' => $lastMonth, 'created_at' => $lastMonth, 'external_id' => 'k1']);
     DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'k1', 'log_uid' => 'x', 'occurred_at' => $lastMonth->format('Y-m-d H:i:s.v'), 'created_at' => $lastMonth->format('Y-m-d H:i:s.v')]);
 
     $this->artisan('audit:prune')->assertSuccessful();
@@ -72,13 +102,13 @@ it('drops monthly partitions older than the platform maximum', function () {
 
 it('restores one project from the archive without duplicates', function () {
     $project = Project::factory()->create(['retention_days' => 7]);
-    $log = makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20), 'new_values' => ['a' => 1], 'external_id' => 'order-1']);
+    $log = expiredLog($project, ['new_values' => ['a' => 1], 'external_id' => 'order-1']);
     DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'order-1', 'log_uid' => $log->uid, 'occurred_at' => $log->getRawOriginal('occurred_at'), 'created_at' => $log->getRawOriginal('occurred_at')]);
     $this->artisan('audit:prune')->assertSuccessful();
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0)
         ->and(DB::table('ingestion_keys')->count())->toBe(0);
 
-    $this->artisan('audit:restore-archive', ['project' => $project->slug, '--from' => now()->subDays(30)->toDateString(), '--to' => now()->toDateString()])
+    $this->artisan('audit:restore-archive', ['project' => $project->slug, '--from' => now()->startOfMonth()->subDays(30)->toDateString(), '--to' => now()->toDateString()])
         ->assertSuccessful();
     $this->artisan('audit:restore-archive', ['project' => $project->slug])->assertSuccessful();
 
@@ -93,7 +123,7 @@ it('restores one project from the archive without duplicates', function () {
 it('keeps archived rows during the soft-archive grace period', function () {
     config(['audit.archive.grace_days' => 7]);
     $project = Project::factory()->create(['retention_days' => 7]);
-    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+    expiredLog($project);
 
     $this->artisan('audit:prune')->assertSuccessful();
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(1)
@@ -107,7 +137,7 @@ it('keeps archived rows during the soft-archive grace period', function () {
 
 it('does not delete restored logs again while their hold lasts', function () {
     $project = Project::factory()->create(['retention_days' => 7]);
-    makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20)]);
+    expiredLog($project);
     $this->artisan('audit:prune')->assertSuccessful();
     expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
 

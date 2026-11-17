@@ -20,7 +20,7 @@ use Throwable;
  * prune for audit.archive.restore_hold_days days.
  *
  * Only the archive folders that can hold the range are listed: files are
- * filed by the day the log was archived, which is between occurred_at and
+ * filed by the month the log was stored in, which is between occurred_at and
  * occurred_at + the retention ceiling, so a restore does not list the
  * project's whole archive. The idempotency keys (ingestion_keys) of restored
  * logs are put back too, so a client retry is still answered `duplicate`.

@@ -40,7 +40,7 @@
 | المتطلب | الحالة | الدليل |
 |---|---|---|
 | الـ API هو العقد، وموثّق في OpenAPI | ✓ | `docs/openapi.yaml`، `/docs/api` |
-| حزمة `company/audit-client`: ريبو مستقل، PHP 8.2+، Laravel 11/12/13 | ✓ | ريبو `audit-client` (v1.0.0) |
+| حزمة `company/audit-client`: ريبو مستقل، PHP 8.2+، Laravel 11/12/13 | ✓ | ريبو `audit-client` (الإصدار الحالي v1.2.0) |
 | إعدادات endpoint/project/key/secret/queue/timeout/retry/enabled | ✓ | `config/audit-client.php` |
 | إرسال غير متزامن بطابور + Exponential backoff | ✓ | `Jobs/SendAuditLogs`، واختبارات الحزمة |
 | تجميع إلى `/logs/batch` | ✓ | `Support/Buffer` |
@@ -153,7 +153,7 @@
 |---|---|
 | الريبو مع Docker بأمر واحد | `./bin/setup` |
 | OpenAPI + README | `docs/openapi.yaml`، `README.md`، `docs/integration-guide.md` |
-| حزمة audit-client بريبو مستقل | `audit-client/` (v1.0.0) |
+| حزمة audit-client بريبو مستقل | `audit-client/` (v1.2.0، الوسوم v1.0.1 و v1.1.0 و v1.2.0) |
 | schema.sql/ERD + Migrations نظيفة | `database/schema/schema.sql`، `docs/erd/erd.pdf`، `docs/schema.md` |
 | Runbook | `docs/runbook.md` |
 | مصفوفة الأدوار موثقة ومختبرة | `docs/permissions-matrix.md` + `RoleMatrixTest` |

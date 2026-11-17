@@ -43,10 +43,10 @@ class ProjectsTable
                 TextColumn::make('slug')->label('المعرّف')->searchable()->fontFamily('mono')->copyable(),
                 IconColumn::make('is_active')->label('نشط')->boolean(),
                 TextColumn::make('logs_today')->label('سجلات اليوم')->numeric()->sortable(),
-                TextColumn::make('last_received_at')->label('آخر استلام')->dateTime()->since()->placeholder('—')->sortable(),
+                TextColumn::make('last_received_at')->label('آخر استلام')->dateTime('Y-m-d H:i')->since()->placeholder('—')->sortable(),
                 TextColumn::make('active_keys_count')->label('مفاتيح نشطة')->numeric(),
                 TextColumn::make('retention_days')->label('الاحتفاظ (يوم)')->numeric()->toggleable(),
-                TextColumn::make('archived_at')->label('أُرشف')->dateTime()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('archived_at')->label('أُرشف')->dateTime('Y-m-d H:i')->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 TernaryFilter::make('archived')

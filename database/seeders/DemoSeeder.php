@@ -188,14 +188,24 @@ class DemoSeeder extends Seeder
                 $keys->create($project, "{$slug}-reader", [ProjectApiKey::SCOPE_READ], 'production', false);
             }
 
-            if (AuditLog::query()->withoutGlobalScopes()->where('project_id', $project->id)->exists()) {
-                continue; // idempotent: logs are append-only, never re-seeded
+            // Logs are append-only, so a second run never re-seeds: it only tops
+            // up the time since the last demo log, at the same daily rate, so the
+            // dashboard ("today", "last 24 hours") is not empty on a later day.
+            $now = CarbonImmutable::now('UTC');
+            $existing = AuditLog::query()->withoutGlobalScopes()->where('project_id', $project->id);
+            $seeded = (clone $existing)->count();
+            $latest = (clone $existing)->max('occurred_at');
+            $from = $latest === null ? $now->subDays(13) : CarbonImmutable::parse((string) $latest, 'UTC');
+            $span = max(0, $now->getTimestamp() - 120 - $from->getTimestamp());
+            $add = $latest === null ? $count : (int) round($count / 13 * $span / 86400);
+            if ($add === 0 || $span < 3600) {
+                continue;
             }
 
             $rows = [];
-            for ($i = 0; $i < $count; $i++) {
+            for ($i = $seeded; $i < $seeded + $add; $i++) {
                 [$event, $action, $subject, $old, $new] = $events[mt_rand(0, count($events) - 1)];
-                $at = CarbonImmutable::now('UTC')->subSeconds(mt_rand(120, 13 * 86400));
+                $at = $now->subSeconds(120 + mt_rand(0, $span));
                 $rows[] = [
                     'uid' => (string) Str::ulid(),
                     'project_id' => $project->id,
@@ -223,6 +233,10 @@ class DemoSeeder extends Seeder
             foreach (array_chunk($rows, 200) as $chunk) {
                 DB::table('audit_logs')->insert($chunk);
             }
+
+            // The writer key "received" the newest log ("last received" on the dashboard).
+            DB::table('project_api_keys')->where('project_id', $project->id)->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE)
+                ->update(['last_used_at' => substr((string) AuditLog::query()->withoutGlobalScopes()->where('project_id', $project->id)->max('received_at'), 0, 19)]);
         }
 
         foreach (self::ACCOUNTS as [$email, $name, $role, $projectSlug]) {

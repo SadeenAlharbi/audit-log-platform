@@ -42,7 +42,7 @@ class UserForm
                 ->visible(fn (?User $record) => auth()->user()?->canGlobally('roles.manage') && ! auth()->user()->is($record))
                 ->schema([
                     CheckboxList::make('platform_roles')
-                        ->hiddenLabel()
+                        ->label('أدوار المنصة')->hiddenLabel()
                         ->options(fn () => Role::query()->where('scope', 'platform')->orderBy('name')->pluck('name', 'name')
                             ->mapWithKeys(fn ($n) => [$n => Labels::role($n)])->all())
                         ->descriptions(fn () => Role::query()->where('scope', 'platform')->pluck('name')

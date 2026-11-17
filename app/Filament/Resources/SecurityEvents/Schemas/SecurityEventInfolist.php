@@ -21,13 +21,15 @@ class SecurityEventInfolist
                 TextEntry::make('ip')->label('عنوان IP')->fontFamily('mono')->copyable(),
                 TextEntry::make('project.name')->label('المشروع')->placeholder('غير معروف'),
                 TextEntry::make('apiKey.name')->label('المفتاح')->placeholder('—'),
-                TextEntry::make('apiKey.key_prefix')->label('بادئة المفتاح')->fontFamily('mono')->placeholder('—'),
+                // Unknown keys have no row: show the prefix that was sent (request_meta).
+                TextEntry::make('key_prefix')->label('بادئة المفتاح')->fontFamily('mono')->placeholder('—')
+                    ->state(fn (SecurityEvent $record): ?string => $record->apiKey->key_prefix ?? ($record->request_meta['key_prefix'] ?? null)),
             ]),
             Section::make('تفاصيل الطلب')->columnSpanFull()->schema([
-                KeyValueEntry::make('request_meta')->hiddenLabel()
+                KeyValueEntry::make('request_meta')->label('تفاصيل الطلب')->hiddenLabel()
                     ->keyLabel('البيان')->valueLabel('القيمة')
                     ->state(fn (SecurityEvent $record) => collect($record->request_meta ?? [])
-                        ->mapWithKeys(fn ($v, $k) => [(Labels::SECURITY_DETAILS[$k] ?? $k) => is_scalar($v) ? (string) $v : json_encode($v)])->all()),
+                        ->mapWithKeys(fn ($v, $k) => [(Labels::SECURITY_DETAILS[$k] ?? $k) => "\u{2068}".(is_scalar($v) ? (string) $v : json_encode($v))."\u{2069}"])->all()),
             ]),
         ]);
     }

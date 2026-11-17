@@ -26,6 +26,7 @@ class PlatformAuditInfolist
                 TextEntry::make('target_id')->label('معرّف الهدف')->placeholder('—'),
                 TextEntry::make('ip')->label('عنوان IP')->placeholder('—'),
                 TextEntry::make('user_agent')->label('المتصفح أو الجهاز')->columnSpanFull()
+                    ->formatStateUsing(fn (?string $state): ?string => $state === 'console' ? 'سطر الأوامر (أمر artisan أو مهمة مجدولة)' : $state)
                     ->visible(fn ($record): bool => filled($record->user_agent)),
             ]),
             // Before / after as a table (same view as the audit log diff).
@@ -48,7 +49,7 @@ class PlatformAuditInfolist
                 ->visible(fn (PlatformAudit $record): bool => PlatformAuditChanges::isConfig($record->action, $record->changes ?? [])
                     || (PlatformAuditChanges::diffRows($record->action, $record->changes) === null && filled($record->changes)))
                 ->schema([
-                    KeyValueEntry::make('changes')->hiddenLabel()
+                    KeyValueEntry::make('changes')->label('التفاصيل')->hiddenLabel()
                         ->keyLabel('البند')->valueLabel('القيمة')
                         ->state(fn (PlatformAudit $record): array => PlatformAuditChanges::details($record->action, $record->changes))
                         ->extraAttributes(fn (PlatformAudit $record): array => PlatformAuditChanges::isConfig($record->action, $record->changes ?? []) ? ['dir' => 'ltr'] : []),

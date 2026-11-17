@@ -57,7 +57,7 @@ class ApiKeysRelationManager extends RelationManager
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')->label('الاسم')->searchable(),
-                TextColumn::make('key_prefix')->label('البادئة')->fontFamily('mono')->suffix('…'),
+                TextColumn::make('key_prefix')->label('البادئة')->fontFamily('mono')->suffix('…')->extraAttributes(['dir' => 'ltr']),
                 TextColumn::make('environment')->label('البيئة')->badge()
                     ->formatStateUsing(fn (string $state) => ['production' => 'إنتاج', 'staging' => 'تجريبي', 'development' => 'تطوير'][$state] ?? $state)
                     ->color(fn (string $state) => $state === 'production' ? 'success' : 'gray')
@@ -72,7 +72,7 @@ class ApiKeysRelationManager extends RelationManager
                     ->color(fn (string $state) => ['active' => 'success', 'expired' => 'warning', 'revoked' => 'danger'][$state]),
                 TextColumn::make('allowed_ips')->label('عناوين IP المسموحة')->badge()->placeholder('الكل')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('last_used_at')->label('آخر استخدام')->since()->placeholder('لم يُستخدم'),
-                TextColumn::make('expires_at')->label('ينتهي')->date()->placeholder('—')
+                TextColumn::make('expires_at')->label('ينتهي')->date('Y-m-d')->placeholder('—')
                     ->color(fn (ProjectApiKey $record) => $record->expires_at?->lessThan(now()->addDays(14)) ? 'warning' : null),
             ])
             ->filters([

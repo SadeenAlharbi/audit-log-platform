@@ -28,6 +28,9 @@
     .dark .alh-guide-tabs button[aria-selected="true"] { background: var(--primary-600); color: #fff; }
     .alh-guide-code { max-width: 100%; overflow-x: auto; margin: 0; padding: 1rem; border-radius: .5rem;
         background: var(--gray-950); color: var(--gray-100); font-size: .75rem; line-height: 1.6; }
+    /* Key / value lists: Arabic keys in the body font; technical keys (settings, dir=ltr) stay monospace. */
+    .fi-in-key-value th, .fi-in-key-value td { font-family: var(--font-family), ui-sans-serif, system-ui, sans-serif !important; }
+    [dir="ltr"] .fi-in-key-value tbody th { font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important; }
     /* Before / after table of an audit log. */
     .alh-diff { overflow-x: auto; border: 1px solid var(--gray-200); border-radius: .5rem; }
     .dark .alh-diff { border-color: rgb(255 255 255 / .1); }

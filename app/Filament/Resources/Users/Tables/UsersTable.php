@@ -30,7 +30,7 @@ class UsersTable
                 IconColumn::make('is_active')->label('نشط')->boolean(),
                 IconColumn::make('mfa')->label('المصادقة الثنائية')->boolean()
                     ->state(fn (User $record) => filled($record->app_authentication_secret)),
-                TextColumn::make('locked_until')->label('مقفل حتى')->dateTime()->placeholder('—')->color('danger'),
+                TextColumn::make('locked_until')->label('مقفل حتى')->dateTime('Y-m-d H:i')->placeholder('—')->color('danger'),
                 TextColumn::make('last_login_at')->label('آخر دخول')->since()->placeholder('لم يدخل'),
             ])
             ->filters([

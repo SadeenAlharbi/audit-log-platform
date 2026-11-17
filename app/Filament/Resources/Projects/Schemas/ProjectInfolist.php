@@ -27,7 +27,7 @@ class ProjectInfolist
                     ->visible(fn (Project $record): bool => filled($record->description)),
                 TextEntry::make('creator.name')->label('أنشأه')
                     ->visible(fn (Project $record): bool => $record->creator !== null),
-                TextEntry::make('archived_at')->label('أُرشف في')->dateTime()
+                TextEntry::make('archived_at')->label('أُرشف في')->dateTime('Y-m-d H:i')
                     ->visible(fn (Project $record): bool => $record->archived_at !== null),
             ]),
 
@@ -43,7 +43,7 @@ class ProjectInfolist
                         ->where('project_id', $record->id)
                         ->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE)
                         ->max('last_used_at'))
-                    ->dateTime()
+                    ->dateTime('Y-m-d H:i')
                     ->since()
                     ->placeholder('لا يوجد بعد'),
                 TextEntry::make('active_keys')

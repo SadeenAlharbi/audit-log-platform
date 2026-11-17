@@ -30,7 +30,9 @@ class SecurityEventsTable
                 TextColumn::make('ip')->label('عنوان IP')->searchable()->fontFamily('mono')->copyable(),
                 TextColumn::make('project.name')->label('المشروع')->placeholder('غير معروف'),
                 TextColumn::make('apiKey.key_prefix')->label('المفتاح')->fontFamily('mono')->placeholder('—'),
-                TextColumn::make('request_meta.path')->label('المسار')->fontFamily('mono')->toggleable(),
+                TextColumn::make('request_meta.path')->label('المسار')->fontFamily('mono')->toggleable()
+                    // First-strong isolate: "/api/v1/logs" keeps its slashes in place in the RTL table.
+                    ->formatStateUsing(fn (?string $state): ?string => $state === null ? null : "\u{2068}{$state}\u{2069}"),
             ])
             ->filters([
                 SelectFilter::make('reason')->label('السبب')->multiple()

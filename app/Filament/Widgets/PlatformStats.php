@@ -37,7 +37,9 @@ class PlatformStats extends StatsOverviewWidget
 
             return [
                 'today' => AuditLog::query()->where('occurred_at', '>=', $today)->count(),
-                'yesterday' => AuditLog::query()->whereBetween('occurred_at', [$today->copy()->subDay(), $today])->count(),
+                // Same part of yesterday (midnight to this time), not the whole day:
+                // a whole day against a morning always reads as a drop.
+                'yesterday' => AuditLog::query()->whereBetween('occurred_at', [$today->copy()->subDay(), now()->subDay()])->count(),
                 'critical' => AuditLog::query()->where('occurred_at', '>=', $today)->where('severity', 'critical')->count(),
                 'projects' => Project::query()->whereNull('archived_at')->where('is_active', true)->count(),
                 'rejected' => $user->canGlobally('security_events.view')
@@ -56,7 +58,8 @@ class PlatformStats extends StatsOverviewWidget
 
         return array_values(array_filter([
             Stat::make('سجلات اليوم', number_format($data['today']))
-                ->description($trend === null ? 'منذ منتصف الليل (UTC)' : ($trend >= 0 ? "+{$trend}% عن أمس" : "{$trend}% عن أمس"))
+                ->description($trend === null ? 'منذ منتصف الليل' : "\u{2066}".($trend >= 0 ? '+' : '').$trend."%\u{2069} عن نفس الوقت أمس")
+                ->descriptionIcon($trend === null ? null : ($trend >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down'))
                 ->color('primary'),
             Stat::make('أحداث حرجة اليوم', number_format($data['critical']))
                 ->description('خطورة «حرج»')

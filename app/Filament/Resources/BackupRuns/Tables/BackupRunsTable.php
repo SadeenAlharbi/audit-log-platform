@@ -40,7 +40,8 @@ class BackupRunsTable
                         : null)
                     ->placeholder('—'),
                 TextColumn::make('size')->label('الحجم')
-                    ->formatStateUsing(fn ($state) => $state ? Number::fileSize((int) $state) : '—'),
+                    // Left-to-right isolate: "135 KB", not "KB 135", in the RTL table.
+                    ->formatStateUsing(fn ($state) => $state ? "\u{2066}".Number::fileSize((int) $state)."\u{2069}" : '—'),
                 TextColumn::make('location')->label('الموقع')->fontFamily('mono')->limit(32)->tooltip(fn ($state) => $state)->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('triggeredBy.name')->label('بواسطة')->placeholder('مجدول'),
                 TextColumn::make('error')->label('الخطأ')->color('danger')->limit(40)->tooltip(fn ($state) => $state)->placeholder('—'),

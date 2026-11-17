@@ -28,12 +28,12 @@ class AuditLogInfolist
                 TextEntry::make('severity')->label('الخطورة')->badge()
                     ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
                     ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
-                TextEntry::make('project.name')->label('المشروع'),
-                TextEntry::make('occurred_at')->label('وقت الحدث')->dateTime('Y-m-d H:i:s.v')
+                TextEntry::make('project.name')->label('المشروع')->columnSpan(2),
+                TextEntry::make('occurred_at')->label('وقت الحدث')->dateTime('Y-m-d H:i:s.v')->columnSpan(2)
                     ->hint(fn (AuditLog $record): string => $record->occurred_at->utc()->format('Y-m-d H:i:s.v').' UTC'),
-                TextEntry::make('received_at')->label('وقت الاستلام')->dateTime('Y-m-d H:i:s.v')
+                TextEntry::make('received_at')->label('وقت الاستلام')->dateTime('Y-m-d H:i:s.v')->columnSpan(2)
                     ->hint(fn (AuditLog $record): string => $record->received_at->utc()->format('Y-m-d H:i:s.v').' UTC'),
-                TextEntry::make('tags')->label('الوسوم')->badge()
+                TextEntry::make('tags')->label('الوسوم')->badge()->columnSpan(2)
                     ->visible(fn (AuditLog $record): bool => filled($record->tags)),
             ]),
 
@@ -85,7 +85,8 @@ class AuditLogInfolist
                 ->visible(fn (AuditLog $record): bool => filled($record->metadata))
                 ->schema([
                     KeyValueEntry::make('metadata')
-                        ->hiddenLabel()
+                        ->label('بيانات إضافية')->hiddenLabel()
+                        ->keyLabel('البند')->valueLabel('القيمة')
                         ->state(function (AuditLog $record) {
                             $reveal = auth()->user()?->can('viewSensitive', $record) ?? false;
                             $data = $reveal ? $record->metadata : app(SensitiveDataMasker::class)->mask($record->metadata);

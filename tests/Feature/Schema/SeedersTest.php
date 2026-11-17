@@ -41,6 +41,16 @@ it('seeds an idempotent demo environment with one account per role', function ()
         ->toBe([Project::query()->withoutGlobalScopes()->where('slug', 'sis')->value('id')]);
 });
 
+it('tops up the demo logs on a later day so the dashboard has recent data', function () {
+    $this->seed(DemoSeeder::class);
+    $this->travel(2)->days();
+    $this->seed(DemoSeeder::class);
+
+    $recent = AuditLog::query()->withoutGlobalScopes()->where('occurred_at', '>=', now()->subDay())->count();
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBeGreaterThan(810)->toBeLessThan(810 + 200)
+        ->and($recent)->toBeGreaterThan(0);
+});
+
 it('refuses to seed demo data in production', function () {
     app()->detectEnvironment(fn () => 'production');
 

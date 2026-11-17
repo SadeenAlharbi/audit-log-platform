@@ -28,10 +28,11 @@ class ViewProject extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            // One style for all three (outlined, with an icon), so they line up.
-            EditAction::make()->icon(Heroicon::OutlinedPencilSquare)->outlined(),
-            SendTestLogAction::make()->outlined(),
-            ArchiveProjectAction::make()->outlined(),
+            // One style for all three (solid, with an icon, like the other
+            // pages' main buttons), so they line up.
+            EditAction::make()->icon(Heroicon::OutlinedPencilSquare),
+            SendTestLogAction::make()->color('primary'),
+            ArchiveProjectAction::make(),
         ];
     }
 

@@ -140,28 +140,29 @@ class DemoSeeder extends Seeder
         }
 
         $now = CarbonImmutable::now('UTC');
+        // type, status, days ago, size (bytes), location, minutes taken, error
         $runs = [
-            ['full', 'succeeded', 1, 182_000_000, 'offsite:audit-backups/full/'],
-            ['incremental', 'succeeded', 0, 6_400_000, 'offsite:audit-backups/incremental/'],
-            ['binlog', 'succeeded', 0, 1_200_000, 'offsite:audit-backups/binlogs/'],
-            ['logs_archive', 'succeeded', 0, 2_300_000, 'archive:logs/'],
-            ['app_files', 'succeeded', 0, 450_000, 'offsite:audit-backups/app/'],
-            ['restore_test', 'succeeded', 3, null, null],
-            ['incremental', 'failed', 2, null, null],
+            ['full', 'succeeded', 1, 182_000_000, 'offsite:audit-backups/full/', 6, null],
+            ['incremental', 'succeeded', 0, 6_400_000, 'offsite:audit-backups/incremental/', 1, null],
+            ['binlog', 'succeeded', 0, 1_200_000, 'offsite:audit-backups/binlogs/', 1, null],
+            ['logs_archive', 'succeeded', 0, 2_300_000, 'archive:logs/', 1, null],
+            ['app_files', 'succeeded', 0, 450_000, 'offsite:audit-backups/app/', 1, null],
+            ['restore_test', 'succeeded', 3, null, null, 9, null],
+            ['incremental', 'failed', 2, null, null, 1, 'Upload to off-site storage timed out (demo)'],
         ];
 
-        foreach ($runs as $i => [$type, $status, $daysAgo, $size, $location]) {
+        foreach ($runs as $i => [$type, $status, $daysAgo, $size, $location, $minutes, $error]) {
             $started = $now->subDays($daysAgo)->subHours($i + 1);
             BackupRun::query()->create([
                 'type' => $type,
                 'status' => $status,
                 'size' => $size,
                 'location' => $location,
-                'checksum' => $status === 'succeeded' && $size !== null ? hash('sha256', "demo-{$type}-{$i}") : null,
+                'checksum' => $location === null ? null : hash('sha256', "demo-{$type}-{$i}"),
                 'meta' => ['demo' => true],
                 'started_at' => $started,
-                'finished_at' => $started->addMinutes($type === 'full' ? 6 : 1),
-                'error' => $status === 'failed' ? 'Upload to off-site storage timed out (demo)' : null,
+                'finished_at' => $started->addMinutes($minutes),
+                'error' => $error,
             ]);
         }
     }

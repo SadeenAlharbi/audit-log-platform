@@ -39,7 +39,7 @@ class AuditLogInfolist
 
             Section::make('مَن وعلى ماذا')->columnSpanFull()->schema([
                 Grid::make(2)->schema([
-                    Fieldset::make('الفاعل')->columns(2)->schema([
+                    Fieldset::make('منفّذ الإجراء')->columns(2)->schema([
                         TextEntry::make('actor_name')->label('الاسم')->placeholder('—'),
                         TextEntry::make('actor_id')->label('المعرّف')->placeholder('—'),
                         TextEntry::make('actor_type')->label('النوع')->placeholder('—'),

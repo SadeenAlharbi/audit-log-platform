@@ -32,7 +32,7 @@ class ActiveProjectsTable extends TableWidget
                     ->whereColumn('project_api_keys.project_id', 'projects.id')
                     ->whereJsonContains('scopes', ProjectApiKey::SCOPE_WRITE), 'last_received_at')
                 ->orderByDesc('logs_24h')
-                ->limit(10))
+                ->limit(50))
             ->paginated(false)
             ->recordUrl(fn (Project $record) => ProjectResource::getUrl('view', ['record' => $record]))
             ->columns([

@@ -61,4 +61,10 @@
     /* Filter lists: values such as "employee.*" or "student.grade.updated"
        keep their left-to-right order in the right-to-left page. */
     .fi-ta-filters .fi-select-input-option, .fi-ta-filters .fi-select-input-option > span, .fi-ta-filters .fi-select-input-value-label { unicode-bidi: plaintext; text-align: right; }
+    /* Dashboard tables (top events, most active projects): side by side at
+       the same height; the rows scroll inside, under a fixed header. */
+    .fi-wi-table .fi-ta-ctn { height: 28rem; display: flex; flex-direction: column; }
+    .fi-wi-table .fi-ta-content-ctn { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    .fi-wi-table .fi-ta-content-ctn thead th { position: sticky; top: 0; z-index: 1; background: var(--gray-50); }
+    .dark .fi-wi-table .fi-ta-content-ctn thead th { background: var(--gray-900); }
 </style>

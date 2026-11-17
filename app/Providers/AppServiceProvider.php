@@ -14,6 +14,7 @@ use App\Observers\PlatformAuditObserver;
 use App\Policies\RolePolicy;
 use App\Services\Security\SecurityEventRecorder;
 use App\Support\Time\DisplayTime;
+use Filament\Actions\Action;
 use Filament\Schemas\Schema;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
@@ -53,7 +54,14 @@ class AppServiceProvider extends ServiceProvider
         // One digit style across the dashboard (Latin digits, as most Saudi
         // government platforms use): Filament formats numbers with the app
         // locale (ar) unless told otherwise, which mixed ٣٦٥ and 365.
-        Table::configureUsing(fn (Table $table) => $table->defaultNumberLocale('en'));
+        Table::configureUsing(fn (Table $table) => $table
+            ->defaultNumberLocale('en')
+            // "Apply filters" also closes the filters dropdown (Filament keeps
+            // it open). close() is the dropdown's own Alpine method; the guard
+            // keeps it from running anywhere else.
+            ->filtersApplyAction(fn (Action $action) => $action->extraAttributes([
+                'x-on:click' => "\$el.closest('.fi-dropdown') && close()",
+            ], merge: true)));
         Schema::configureUsing(fn (Schema $schema) => $schema->defaultNumberLocale('en'));
 
         // Times in the dashboard (columns, entries, date pickers) are shown in

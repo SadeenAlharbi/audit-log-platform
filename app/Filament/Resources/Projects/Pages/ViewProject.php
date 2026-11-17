@@ -9,6 +9,7 @@ use App\Filament\Support\IssuedKeyPresenter;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Icons\Heroicon;
 
 class ViewProject extends ViewRecord
 {
@@ -27,9 +28,10 @@ class ViewProject extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
-            SendTestLogAction::make(),
-            ArchiveProjectAction::make(),
+            // One style for all three (outlined, with an icon), so they line up.
+            EditAction::make()->icon(Heroicon::OutlinedPencilSquare)->outlined(),
+            SendTestLogAction::make()->outlined(),
+            ArchiveProjectAction::make()->outlined(),
         ];
     }
 

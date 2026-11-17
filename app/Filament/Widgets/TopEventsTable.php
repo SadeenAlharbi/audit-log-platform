@@ -23,7 +23,7 @@ class TopEventsTable extends TableWidget
                 ->selectRaw('event, COUNT(*) AS total, MAX(occurred_at) AS last_at')
                 ->groupBy('event')
                 ->orderByDesc('total')
-                ->limit(10))
+                ->limit(50))
             ->paginated(false)
             ->columns([
                 TextColumn::make('event')->label('الحدث')->fontFamily('mono'),

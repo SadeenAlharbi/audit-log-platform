@@ -64,7 +64,7 @@ erDiagram
 | `external_id` | VARCHAR(191) NULL | التفرّد مضمون في `ingestion_keys` |
 | `event`, `action` | VARCHAR | `user.updated` / `update` |
 | `severity` | ENUM | info / warning / critical |
-| `actor_type`, `actor_id`, `actor_name`, `actor_ip`, `user_agent` | VARCHAR | الفاعل |
+| `actor_type`, `actor_id`, `actor_name`, `actor_ip`, `user_agent` | VARCHAR | منفّذ الإجراء (الفاعل) |
 | `subject_type`, `subject_id` | VARCHAR | الكيان المتأثر |
 | `old_values`, `new_values`, `metadata`, `tags` | JSON | |
 | `request_id`, `correlation_id` | VARCHAR(64) | ربط الأحداث المتسلسلة |

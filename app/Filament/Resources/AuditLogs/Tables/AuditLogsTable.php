@@ -101,7 +101,7 @@ class AuditLogsTable
                     ->color(fn (string $state) => self::SEVERITY_COLORS[$state] ?? 'gray'),
                 // Systems often send only actor type + id: show "user #42"
                 // when there is no name, and the type/id under the name.
-                TextColumn::make('actor_name')->label('الفاعل')->searchable(['actor_name', 'actor_id'])
+                TextColumn::make('actor_name')->label('منفّذ الإجراء')->searchable(['actor_name', 'actor_id'])
                     ->state(fn (AuditLog $record) => $record->actor_name
                         ?? ($record->actor_id !== null ? trim(($record->actor_type ?? '').' #'.$record->actor_id) : null))
                     ->description(fn (AuditLog $record) => $record->actor_name !== null
@@ -154,7 +154,7 @@ class AuditLogsTable
                         self::listFilter('action', 'العملية', null,
                             fn (?string $search, array $period) => AuditLogFilterOptions::actions($search, $period),
                             fn (string $value) => AuditLogFilterOptions::actionLabel($value)),
-                        self::listFilter('actor_id', 'الفاعل', null,
+                        self::listFilter('actor_id', 'منفّذ الإجراء', null,
                             fn (?string $search, array $period) => AuditLogFilterOptions::actors($search, $period),
                             fn (string $value, array $period) => AuditLogFilterOptions::actors($value, $period)[$value] ?? $value),
                         self::listFilter('subject_type', 'نوع الكيان', null,

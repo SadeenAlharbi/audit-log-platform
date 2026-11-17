@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Projects\Schemas;
 use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\ProjectApiKey;
+use App\Support\Time\DisplayTime;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
@@ -67,7 +68,7 @@ class ProjectInfolist
         return AuditLog::query()
             ->withoutGlobalScopes()
             ->where('project_id', $project->id)
-            ->where('occurred_at', '>=', now()->utc()->startOfDay())
+            ->where('occurred_at', '>=', DisplayTime::startOfDayUtc())
             ->count();
     }
 }

@@ -52,7 +52,17 @@ export RCLONE_CONFIG="${RCLONE_CONFIG:-/tmp/rclone.conf}"
 now_iso() { date -u +%FT%TZ; }
 stamp() { date -u +%Y%m%dT%H%M%SZ; }
 
-conn=(--host="$DB_HOST" --port="$DB_PORT" --user="$DB_BACKUP_USERNAME" --password="$DB_BACKUP_PASSWORD")
+# Credentials go in a private option file, not on the command line, where
+# they would show in `ps` inside the container. --defaults-extra-file must
+# be the first option of every mariadb / mariadb-backup call.
+DB_OPTION_FILE="$(mktemp /tmp/backup-db.XXXXXX)"
+chmod 600 "$DB_OPTION_FILE"
+trap 'rm -f "$DB_OPTION_FILE"' EXIT
+for group in client mariadb-backup; do
+    printf '[%s]\nhost=%s\nport=%s\nuser=%s\npassword="%s"\n' \
+        "$group" "$DB_HOST" "$DB_PORT" "$DB_BACKUP_USERNAME" "$(printf '%s' "$DB_BACKUP_PASSWORD" | sed 's/[\\"]/\\&/g')"
+done > "$DB_OPTION_FILE"
+conn=(--defaults-extra-file="$DB_OPTION_FILE")
 
 json_escape() { jq -Rs 'rtrimstr("\n")'; }
 
@@ -144,7 +154,7 @@ run_backup() {
 
     target="$BACKUP_ROOT/$kind/$ts"
     log "$kind backup -> $target"
-    local args=(--backup "${conn[@]}" --datadir="$DATADIR" --target-dir="$target")
+    local args=("${conn[@]}" --backup --datadir="$DATADIR" --target-dir="$target")
     [ "$kind" = "incremental" ] && args+=(--incremental-basedir="$base")
 
     if ! mariadb-backup "${args[@]}" > "$BACKUP_ROOT/last-$kind.log" 2>&1; then

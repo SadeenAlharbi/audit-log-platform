@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Projects\Tables;
 use App\Filament\Resources\Projects\Actions\ArchiveProjectAction;
 use App\Filament\Resources\Projects\Actions\SendTestLogAction;
 use App\Models\ProjectApiKey;
+use App\Support\Time\DisplayTime;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -28,7 +29,7 @@ class ProjectsTable
                     'logs_today' => DB::table('audit_logs')
                         ->selectRaw('COUNT(*)')
                         ->whereColumn('audit_logs.project_id', 'projects.id')
-                        ->where('audit_logs.occurred_at', '>=', now()->utc()->startOfDay()),
+                        ->where('audit_logs.occurred_at', '>=', DisplayTime::startOfDayUtc()),
                     // Last time a write key was used (plan §8 "last received"),
                     // i.e. by arrival time, not by the event's own occurred_at.
                     'last_received_at' => DB::table('project_api_keys')

@@ -22,7 +22,7 @@ class ConfigAuditCommand extends Command
 {
     /** Settings recorded with their value. */
     private const TRACKED = [
-        'audit.retention', 'audit.api.require_https', 'audit.api.rate_limit', 'audit.api.ip_rate_limit',
+        'audit.retention', 'audit.display_timezone', 'audit.api.require_https', 'audit.api.rate_limit', 'audit.api.ip_rate_limit',
         'audit.api.max_payload', 'audit.api.signature_tolerance', 'audit.api_keys', 'audit.accounts',
         'audit.security', 'audit.alerts.mail_to', 'audit.archive', 'audit.backup',
         'audit.saml.enabled', 'audit.saml.tenant_uuid', 'audit.saml.idp.metadata_url', 'audit.saml.idp.entity_id',

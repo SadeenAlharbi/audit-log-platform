@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Support\PlatformsCode;
 use App\Models\AuditLog;
+use App\Support\Time\DisplayTime;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -23,16 +24,18 @@ class LogVolumeChart extends ChartWidget
         $user = auth()->user();
 
         /** @var list<array{day: string, severity: string, total: int}> $rows */
+        // Days are the users' local days (DisplayTime), not UTC days.
+        $offset = DisplayTime::offsetMinutes();
         $rows = Cache::remember('dashboard:volume:'.$user->id, 300, fn () => AuditLog::query()
-            ->where('occurred_at', '>=', now()->utc()->subDays(13)->startOfDay())
-            ->selectRaw('DATE(occurred_at) AS day, severity, COUNT(*) AS total')
+            ->where('occurred_at', '>=', DisplayTime::startOfDayUtc(13))
+            ->selectRaw("DATE(DATE_ADD(occurred_at, INTERVAL {$offset} MINUTE)) AS day, severity, COUNT(*) AS total")
             ->groupBy('day', 'severity')
             ->toBase()
             ->get()
             ->map(fn (object $r) => ['day' => (string) $r->day, 'severity' => (string) $r->severity, 'total' => (int) $r->total])
             ->all());
 
-        $days = collect(range(13, 0))->map(fn ($i) => now()->utc()->subDays($i)->toDateString());
+        $days = collect(range(13, 0))->map(fn ($i) => DisplayTime::now()->subDays($i)->toDateString());
         $series = fn (string $severity) => $days->map(fn ($d) => collect($rows)->where('day', $d)->where('severity', $severity)->sum('total'))->all();
 
         return [

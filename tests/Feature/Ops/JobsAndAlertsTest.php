@@ -2,13 +2,17 @@
 
 use App\Jobs\StoreAuditLogs;
 use App\Models\IngestionBatch;
+use App\Models\IngestionKey;
+use App\Models\Project;
 use App\Notifications\Channels\SlackWebhookChannel;
 use App\Notifications\PlatformAlert;
 use App\Services\Alerts\AlertNotifier;
+use Carbon\CarbonImmutable;
 use Illuminate\Queue\Events\QueueBusy;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 it('marks the batch failed and alerts when storing fails for good', function () {
     Notification::fake();
@@ -81,4 +85,40 @@ it('does not expose a $batchId on the storage job (it would be read as a Bus bat
 
     expect(property_exists($job, 'batchId'))->toBeFalse()
         ->and($job->ingestionBatchId)->toBe(42);
+});
+
+it('alerts when an accepted log never reached audit_logs (lost ingest job)', function () {
+    Notification::fake();
+    config(['audit.alerts.mail_to' => ['ops@example.com']]);
+    $project = Project::factory()->create(['slug' => 'erp']);
+    $hourAgo = CarbonImmutable::now('UTC')->subHour();
+
+    // Stored: the key and its log agree on uid and occurred_at.
+    $stored = makeAuditLog($project, ['occurred_at' => $hourAgo]);
+    IngestionKey::query()->create(['project_id' => $project->id, 'external_id' => 'ok-1', 'log_uid' => $stored->uid, 'occurred_at' => $hourAgo, 'created_at' => $hourAgo]);
+
+    $this->artisan('audit:check-ingestion')->assertSuccessful();
+    Notification::assertNothingSent();
+
+    // Lost: the key was reserved, the job never stored the log.
+    IngestionKey::query()->create(['project_id' => $project->id, 'external_id' => 'lost-1', 'log_uid' => (string) Str::ulid(), 'occurred_at' => $hourAgo, 'created_at' => $hourAgo]);
+    // Too recent to count: may still be waiting in the queue.
+    IngestionKey::query()->create(['project_id' => $project->id, 'external_id' => 'new-1', 'log_uid' => (string) Str::ulid(), 'occurred_at' => now('UTC'), 'created_at' => now('UTC')]);
+
+    $this->artisan('audit:check-ingestion')
+        ->expectsOutputToContain('1 accepted log(s) with external_id are missing')
+        ->assertFailed();
+
+    Notification::assertSentOnDemand(PlatformAlert::class, fn ($n) => $n->title === 'Accepted audit logs are missing' && $n->level === 'critical');
+});
+
+it('counts batches still queued after the grace period', function () {
+    Notification::fake();
+    $key = issueKey()->key;
+    $batch = IngestionBatch::query()->create(['project_id' => $key->project_id, 'api_key_id' => $key->id, 'count' => 2, 'accepted_count' => 2, 'status' => 'queued']);
+    $batch->forceFill(['created_at' => now()->subHours(2)])->save();
+
+    $this->artisan('audit:check-ingestion')
+        ->expectsOutputToContain('1 batch(es) still queued')
+        ->assertFailed();
 });

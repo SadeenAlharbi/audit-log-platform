@@ -28,14 +28,18 @@ x-prod-app: &prod-app
 
 services:
   # The web-facing container gets only what it needs (security review M5):
-  # no root, archiver or backup database passwords and no copy of .env.
-  # Retention, archiving and the app-files backup run in the scheduler and
-  # queue-worker, which keep them.
+  # no root, maintenance, archiver or backup database passwords and no copy
+  # of .env. Without the maintenance password a compromised web process
+  # cannot ALTER the schema or drop the append-only triggers (H1).
+  # Migrations, partitions, retention, archiving and the app-files backup
+  # run in the scheduler and queue-worker, which keep them
+  # (docs/runbook.md: `dc exec scheduler php artisan migrate --force`).
   app:
     <<: *prod-app
     environment: !override
       CONTAINER_ROLE: app
       DB_ROOT_PASSWORD: ""
+      DB_MAINTENANCE_PASSWORD: ""
       DB_ARCHIVER_PASSWORD: ""
       DB_BACKUP_PASSWORD: ""
     volumes: !override

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AuditLogs\Tables;
 
 use App\Models\AuditLog;
 use App\Models\Project;
+use App\Support\Time\DisplayTime;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -14,7 +15,6 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 class AuditLogsTable
 {
@@ -38,8 +38,8 @@ class AuditLogsTable
     /**
      * A searchable list: opens with the recent values, typing searches all.
      *
-     * @param  callable(?string): array<string, string>  $options
-     * @param  (callable(string): string)|null  $optionLabel
+     * @param  callable(?string, array{from?: mixed, until?: mixed}): array<string, string>  $options
+     * @param  (callable(string, array{from?: mixed, until?: mixed}): string)|null  $optionLabel
      */
     private static function listFilter(string $name, string $label, ?string $placeholder, callable $options, ?callable $optionLabel = null): Select
     {
@@ -49,9 +49,35 @@ class AuditLogsTable
             ->searchable()
             ->searchPrompt('اكتب للبحث')
             ->noSearchResultsMessage('لا توجد قيمة مطابقة')
-            ->options(fn () => $options(null))
-            ->getSearchResultsUsing(fn (string $search) => $options($search))
-            ->getOptionLabelUsing(fn ($value) => $optionLabel ? $optionLabel((string) $value) : (string) $value);
+            // Limited to the period picked in the "period" filter (not yet
+            // applied picks included), so the lists and the search read only
+            // those partitions (AuditLogFilterOptions).
+            ->options(fn (mixed $livewire) => $options(null, self::pickedPeriod($livewire)))
+            ->getSearchResultsUsing(fn (string $search, mixed $livewire) => $options($search, self::pickedPeriod($livewire)))
+            ->getOptionLabelUsing(fn ($value, mixed $livewire) => $optionLabel ? $optionLabel((string) $value, self::pickedPeriod($livewire)) : (string) $value);
+    }
+
+    /**
+     * The period filter's current state (local time), or [] for the default.
+     *
+     * @return array{from?: mixed, until?: mixed}
+     */
+    public static function pickedPeriod(mixed $livewire): array
+    {
+        $state = data_get($livewire, 'tableDeferredFilters.period') ?? data_get($livewire, 'tableFilters.period');
+        if (! is_array($state)) {
+            return [];
+        }
+
+        $period = [];
+        if (array_key_exists('from', $state)) {
+            $period['from'] = $state['from'];
+        }
+        if (array_key_exists('until', $state)) {
+            $period['until'] = $state['until'];
+        }
+
+        return $period;
     }
 
     public static function configure(Table $table): Table
@@ -92,7 +118,7 @@ class AuditLogsTable
                 Filter::make('period')
                     ->label('الفترة')
                     ->schema([
-                        DateTimePicker::make('from')->label('من')->default(now()->subDays(7)->startOfDay())->required()
+                        DateTimePicker::make('from')->label('من')->default(fn () => DisplayTime::now()->subDays(7)->startOfDay())->required()
                             ->native(false)->seconds(false)->displayFormat('Y/m/d  H:i')->firstDayOfWeek(7),
                         DateTimePicker::make('until')->label('إلى')
                             ->native(false)->seconds(false)->displayFormat('Y/m/d  H:i')->firstDayOfWeek(7),
@@ -100,9 +126,11 @@ class AuditLogsTable
                     ->columns(2)
                     ->columnSpan(2)
                     ->query(fn (Builder $query, array $data) => $query
-                        ->where('occurred_at', '>=', Carbon::parse($data['from'] ?? now()->subDays(7))->utc())
-                        ->when($data['until'] ?? null, fn (Builder $q, $until) => $q->where('occurred_at', '<=', Carbon::parse($until)->utc())))
-                    ->indicateUsing(fn (array $data) => 'من '.Carbon::parse($data['from'] ?? now()->subDays(7))->format('Y-m-d').(filled($data['until'] ?? null) ? ' إلى '.Carbon::parse($data['until'])->format('Y-m-d') : '')),
+                        // The pickers hold local time (DisplayTime); occurred_at is UTC.
+                        ->where('occurred_at', '>=', filled($data['from'] ?? null) ? DisplayTime::toUtc($data['from']) : DisplayTime::startOfDayUtc(7))
+                        ->when($data['until'] ?? null, fn (Builder $q, $until) => $q->where('occurred_at', '<=', DisplayTime::toUtc($until))))
+                    ->indicateUsing(fn (array $data) => 'من '.(filled($data['from'] ?? null) ? DisplayTime::toUtc($data['from']) : DisplayTime::startOfDayUtc(7))->setTimezone(DisplayTime::timezone())->format('Y-m-d H:i')
+                        .(filled($data['until'] ?? null) ? ' إلى '.DisplayTime::toUtc($data['until'])->setTimezone(DisplayTime::timezone())->format('Y-m-d H:i') : '')),
 
                 SelectFilter::make('project_id')
                     ->label('المشروع')
@@ -121,22 +149,22 @@ class AuditLogsTable
                     // typing (AuditLogFilterOptions).
                     ->schema([
                         self::listFilter('event', 'الحدث', null,
-                            fn (?string $search) => AuditLogFilterOptions::events($search))
+                            fn (?string $search, array $period) => AuditLogFilterOptions::events($search, $period))
                             ->helperText('القيم المنتهية بـ .* تختار عائلة كاملة، مثل user.*'),
                         self::listFilter('action', 'العملية', null,
-                            fn (?string $search) => AuditLogFilterOptions::actions($search),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::actions($search, $period),
                             fn (string $value) => AuditLogFilterOptions::actionLabel($value)),
                         self::listFilter('actor_id', 'الفاعل', null,
-                            fn (?string $search) => AuditLogFilterOptions::actors($search),
-                            fn (string $value) => AuditLogFilterOptions::actors($value)[$value] ?? $value),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::actors($search, $period),
+                            fn (string $value, array $period) => AuditLogFilterOptions::actors($value, $period)[$value] ?? $value),
                         self::listFilter('subject_type', 'نوع الكيان', null,
-                            fn (?string $search) => AuditLogFilterOptions::values('subject_type', $search)),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::values('subject_type', $search, $period)),
                         self::listFilter('subject_id', 'معرّف الكيان', null,
-                            fn (?string $search) => AuditLogFilterOptions::values('subject_id', $search)),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::values('subject_id', $search, $period)),
                         self::listFilter('tag', 'الوسم', null,
-                            fn (?string $search) => AuditLogFilterOptions::tags($search)),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::tags($search, $period)),
                         self::listFilter('correlation_id', 'correlation_id', null,
-                            fn (?string $search) => AuditLogFilterOptions::values('correlation_id', $search)),
+                            fn (?string $search, array $period) => AuditLogFilterOptions::values('correlation_id', $search, $period)),
                     ])
                     ->columns(3)
                     ->columnSpanFull()

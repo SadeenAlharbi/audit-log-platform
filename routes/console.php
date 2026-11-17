@@ -41,3 +41,10 @@ Schedule::command('access:review')->quarterlyOn(1, '07:30')->onOneServer();
 // Queues (plan §11): alert when jobs pile up; Horizon metrics.
 Schedule::command('queue:monitor redis-ingest:ingest,redis:default --max='.(int) config('audit.alerts.queue_backlog_threshold', 5000))->everyFiveMinutes();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
+
+// Plan §7 / D21: rejected requests over the per-minute sample are counted,
+// then written here as one summary row per IP, reason and minute.
+Schedule::command('audit:flush-security-events')->everyMinute()->onOneServer()->withoutOverlapping();
+
+// Accepted (202) logs that never reached audit_logs: lost queue jobs.
+Schedule::command('audit:check-ingestion')->everyFifteenMinutes()->onOneServer()->withoutOverlapping();

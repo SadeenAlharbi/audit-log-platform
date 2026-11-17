@@ -19,6 +19,7 @@ use App\Models\Project;
 use App\Models\ProjectApiKey;
 use App\Models\User;
 use App\Services\Export\AuditLogExporter;
+use App\Support\Time\DisplayTime;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
@@ -74,6 +75,44 @@ it('shows a project viewer only their project\'s logs', function () {
         ->assertCanNotSeeTableRecords([$logB]);
 
     $this->get("/admin/audit-logs/{$logB->uid}")->assertNotFound();
+});
+
+it('limits the filter lists and their search to the picked period', function () {
+    $project = Project::factory()->create();
+    makeAuditLog($project, ['event' => 'recent.thing', 'actor_id' => '1']);
+    makeAuditLog($project, ['event' => 'old.thing', 'actor_id' => '2', 'occurred_at' => now()->utc()->subDays(200)]);
+    $this->actingAs(platformUser('platform_auditor'));
+
+    // Default: the last 90 days, for the list and for the typed search.
+    expect(AuditLogFilterOptions::events())->toHaveKey('recent.thing')->not->toHaveKey('old.thing')
+        ->and(AuditLogFilterOptions::events('old'))->toBe([]);
+
+    // A wider period (local time, as the picker holds it) includes it.
+    $period = ['from' => DisplayTime::now()->subDays(250)->format('Y-m-d H:i:s')];
+    expect(AuditLogFilterOptions::events('old', $period))->toHaveKey('old.thing')
+        ->and(AuditLogFilterOptions::actors(null, $period))->toHaveKeys(['1', '2']);
+
+    // A period that ends before the recent log excludes it.
+    $old = ['from' => DisplayTime::now()->subDays(250)->format('Y-m-d H:i:s'), 'until' => DisplayTime::now()->subDays(100)->format('Y-m-d H:i:s')];
+    expect(AuditLogFilterOptions::events(null, $old))->toHaveKey('old.thing')->not->toHaveKey('recent.thing');
+});
+
+it('shows the dashboard in local time and reads the period pickers as local time', function () {
+    config(['audit.display_timezone' => 'Asia/Riyadh']);
+    $project = Project::factory()->create();
+    $localMidnight = DisplayTime::now()->startOfDay();
+    // 30 minutes after local midnight = the previous UTC day (UTC+3).
+    $after = makeAuditLog($project, ['event' => 'after.midnight', 'occurred_at' => $localMidnight->addMinutes(30)->utc()]);
+    $before = makeAuditLog($project, ['event' => 'before.midnight', 'occurred_at' => $localMidnight->subMinutes(30)->utc()]);
+    $this->actingAs(platformUser('platform_auditor'));
+
+    expect(DisplayTime::startOfDayUtc()->format('H:i'))->toBe('21:00')
+        ->and(DisplayTime::toUtc('2026-11-17 08:00:00')->format('Y-m-d H:i'))->toBe('2026-11-17 05:00');
+
+    Livewire::test(ListAuditLogs::class)
+        ->filterTable('period', ['from' => $localMidnight->format('Y-m-d H:i:s')])
+        ->assertCanSeeTableRecords([$after])
+        ->assertCanNotSeeTableRecords([$before]);
 });
 
 it('offers only received values of visible projects in the filter lists', function () {

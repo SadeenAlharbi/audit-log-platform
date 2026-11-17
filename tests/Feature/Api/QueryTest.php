@@ -58,6 +58,24 @@ it('paginates with a cursor', function () {
         ->assertJsonPath('data.0.event', 'e3');
 });
 
+it('keeps milliseconds in the cursor, so logs of the same second are not skipped', function () {
+    $second = CarbonImmutable::now('UTC')->subMinute()->startOfSecond();
+    foreach ([100, 300, 500, 700, 900] as $i => $ms) {
+        makeAuditLog($this->project, ['event' => "same{$i}", 'occurred_at' => $second->addMilliseconds($ms)]);
+    }
+
+    $seen = [];
+    $url = '/api/v1/logs?per_page=2';
+    for ($page = 0; $page < 5 && $url !== null; $page++) {
+        $response = sendApi($this, $this->reader, 'GET', $url)->assertOk();
+        $seen = [...$seen, ...array_column($response->json('data'), 'event')];
+        $cursor = $response->json('meta.next_cursor');
+        $url = $cursor ? '/api/v1/logs?per_page=2&cursor='.$cursor : null;
+    }
+
+    expect($seen)->toBe(['same4', 'same3', 'same2', 'same1', 'same0']);
+});
+
 it('masks sensitive values for API clients', function () {
     makeAuditLog($this->project, ['new_values' => ['password' => 'p@ss', 'name' => 'x', 'nested' => ['access_token' => 't']]]);
 

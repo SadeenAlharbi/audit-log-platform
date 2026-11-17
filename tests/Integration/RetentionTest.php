@@ -72,9 +72,11 @@ it('drops monthly partitions older than the platform maximum', function () {
 
 it('restores one project from the archive without duplicates', function () {
     $project = Project::factory()->create(['retention_days' => 7]);
-    $log = makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20), 'new_values' => ['a' => 1]]);
+    $log = makeAuditLog($project, ['occurred_at' => now()->utc()->subDays(20), 'new_values' => ['a' => 1], 'external_id' => 'order-1']);
+    DB::table('ingestion_keys')->insert(['project_id' => $project->id, 'external_id' => 'order-1', 'log_uid' => $log->uid, 'occurred_at' => $log->getRawOriginal('occurred_at'), 'created_at' => $log->getRawOriginal('occurred_at')]);
     $this->artisan('audit:prune')->assertSuccessful();
-    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0);
+    expect(AuditLog::query()->withoutGlobalScopes()->count())->toBe(0)
+        ->and(DB::table('ingestion_keys')->count())->toBe(0);
 
     $this->artisan('audit:restore-archive', ['project' => $project->slug, '--from' => now()->subDays(30)->toDateString(), '--to' => now()->toDateString()])
         ->assertSuccessful();
@@ -83,7 +85,9 @@ it('restores one project from the archive without duplicates', function () {
     $restored = AuditLog::query()->withoutGlobalScopes()->get();
     expect($restored)->toHaveCount(1)
         ->and($restored->first()->uid)->toBe($log->uid)
-        ->and($restored->first()->new_values)->toBe(['a' => 1]);
+        ->and($restored->first()->new_values)->toBe(['a' => 1])
+        // The idempotency key is back: a retry of order-1 is still a duplicate.
+        ->and(DB::table('ingestion_keys')->where('external_id', 'order-1')->value('log_uid'))->toBe($log->uid);
 });
 
 it('keeps archived rows during the soft-archive grace period', function () {

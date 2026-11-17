@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PreciseImmutableDatetime;
 use App\Models\Concerns\AppendOnly;
 use App\Models\Scopes\ProjectAccessScope;
 use Carbon\CarbonImmutable;
@@ -65,7 +66,8 @@ class AuditLog extends Model
             'new_values' => 'array',
             'metadata' => 'array',
             'tags' => 'array',
-            'occurred_at' => 'immutable_datetime',
+            // Millisecond string form for the API cursor (PreciseDateTime).
+            'occurred_at' => PreciseImmutableDatetime::class,
             'received_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
         ];

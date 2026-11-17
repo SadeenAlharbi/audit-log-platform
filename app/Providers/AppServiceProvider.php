@@ -13,7 +13,9 @@ use App\Models\User;
 use App\Observers\PlatformAuditObserver;
 use App\Policies\RolePolicy;
 use App\Services\Security\SecurityEventRecorder;
+use App\Support\Time\DisplayTime;
 use Filament\Schemas\Schema;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -53,6 +55,10 @@ class AppServiceProvider extends ServiceProvider
         // locale (ar) unless told otherwise, which mixed ٣٦٥ and 365.
         Table::configureUsing(fn (Table $table) => $table->defaultNumberLocale('en'));
         Schema::configureUsing(fn (Schema $schema) => $schema->defaultNumberLocale('en'));
+
+        // Times in the dashboard (columns, entries, date pickers) are shown in
+        // the users' time zone; storage and the API stay in UTC.
+        FilamentTimezone::set(DisplayTime::timezone());
 
         Gate::policy(Role::class, RolePolicy::class);
 

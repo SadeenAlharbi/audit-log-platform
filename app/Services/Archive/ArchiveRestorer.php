@@ -6,6 +6,7 @@ use App\Models\BackupRun;
 use App\Models\Project;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -17,6 +18,12 @@ use Throwable;
  * id and uid; rows that still exist are skipped (INSERT IGNORE), so running
  * it twice is harmless. The restored range is protected from the nightly
  * prune for audit.archive.restore_hold_days days.
+ *
+ * Only the archive folders that can hold the range are listed: files are
+ * filed by the day the log was archived, which is between occurred_at and
+ * occurred_at + the retention ceiling, so a restore does not list the
+ * project's whole archive. The idempotency keys (ingestion_keys) of restored
+ * logs are put back too, so a client retry is still answered `duplicate`.
  */
 class ArchiveRestorer
 {
@@ -50,7 +57,7 @@ class ArchiveRestorer
         $toStr = $to->utc()->format('Y-m-d H:i:s.v');
 
         try {
-            foreach ($disk->allFiles('logs/'.$project->slug) as $manifestPath) {
+            foreach ($this->manifests($disk, $project, $from, $to) as $manifestPath) {
                 if (! str_ends_with($manifestPath, '.json')) {
                     continue;
                 }
@@ -83,6 +90,7 @@ class ArchiveRestorer
                 if (! $dryRun) {
                     foreach (array_chunk($batch, 500) as $chunk) {
                         $inserted += DB::table('audit_logs')->insertOrIgnore($chunk);
+                        $this->restoreKeys($chunk);
                     }
                 }
             }
@@ -99,5 +107,54 @@ class ArchiveRestorer
         }
 
         return ['files' => $files, 'rows' => $rows, 'inserted' => $inserted];
+    }
+
+    /**
+     * Manifests in the month folders that can contain logs of [from, to].
+     *
+     * @return list<string>
+     */
+    private function manifests(Filesystem $disk, Project $project, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $ceiling = (int) config('audit.retention.max_days', 395);
+        $last = $to->utc()->addDays($ceiling + 1)->min(now()->utc())->startOfMonth();
+        // Nothing was archived for the project before it existed.
+        $first = $project->created_at !== null ? $from->utc()->max($project->created_at) : $from->utc();
+
+        $paths = [];
+        for ($month = CarbonImmutable::instance($first)->utc()->startOfMonth(); $month <= $last; $month = $month->addMonth()) {
+            foreach ($disk->allFiles(sprintf('logs/%s/%s', $project->slug, $month->format('Y/m'))) as $path) {
+                if (str_ends_with($path, '.json')) {
+                    $paths[] = $path;
+                }
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Put back the idempotency keys of restored logs that had an external_id.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function restoreKeys(array $rows): void
+    {
+        $keys = [];
+        foreach ($rows as $row) {
+            if (($row['external_id'] ?? null) !== null && $row['external_id'] !== '') {
+                $keys[] = [
+                    'project_id' => $row['project_id'],
+                    'external_id' => $row['external_id'],
+                    'log_uid' => $row['uid'],
+                    'occurred_at' => $row['occurred_at'],
+                    'created_at' => $row['received_at'] ?? $row['occurred_at'],
+                ];
+            }
+        }
+
+        if ($keys !== []) {
+            DB::table('ingestion_keys')->insertOrIgnore($keys);
+        }
     }
 }

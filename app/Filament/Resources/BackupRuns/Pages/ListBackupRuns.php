@@ -71,8 +71,8 @@ class ListBackupRuns extends ListRecords
                 ->schema([
                     Select::make('project')->label('المشروع')->required()
                         ->options(fn () => Project::query()->withoutGlobalScopes()->orderBy('name')->pluck('name', 'slug')->all()),
-                    DatePicker::make('from')->label('من (وقت الحدث)')->required(),
-                    DatePicker::make('to')->label('إلى')->required(),
+                    DatePicker::make('from')->label('من (وقت الحدث، بتوقيت UTC)')->required(),
+                    DatePicker::make('to')->label('إلى (بتوقيت UTC)')->required(),
                 ])
                 ->requiresConfirmation()
                 ->modalDescription('تُعاد السجلات من أرشيف JSONL إلى القاعدة. السجلات الموجودة لا تتكرر.')

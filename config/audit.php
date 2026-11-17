@@ -73,6 +73,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dashboard time zone. Logs are stored and returned by the API in UTC; the
+    | dashboard shows times, date pickers and "today" in this time zone.
+    |--------------------------------------------------------------------------
+    */
+    'display_timezone' => env('AUDIT_DISPLAY_TIMEZONE', 'Asia/Riyadh'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Ingestion API (plan §6, §7)
     |--------------------------------------------------------------------------
     */
@@ -104,6 +112,10 @@ return [
 
         // Queue that stores accepted logs.
         'queue' => env('AUDIT_INGEST_QUEUE', 'ingest'),
+
+        // audit:check-ingestion: an accepted log still missing from
+        // audit_logs after this many minutes raises an alert (lost job).
+        'ingest_check_grace_minutes' => (int) env('AUDIT_INGEST_CHECK_GRACE_MINUTES', 30),
     ],
 
     'api_keys' => [

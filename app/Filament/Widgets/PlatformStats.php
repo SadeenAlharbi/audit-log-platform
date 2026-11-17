@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\IngestionBatch;
 use App\Models\Project;
 use App\Models\SecurityEvent;
+use App\Support\Time\DisplayTime;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Cache;
@@ -32,7 +33,7 @@ class PlatformStats extends StatsOverviewWidget
         $key = 'dashboard:stats:'.$user->id;
 
         $data = Cache::remember($key, 60, function () use ($user) {
-            $today = now()->utc()->startOfDay();
+            $today = DisplayTime::startOfDayUtc(); // local day, as UTC
 
             return [
                 'today' => AuditLog::query()->where('occurred_at', '>=', $today)->count(),
@@ -40,7 +41,10 @@ class PlatformStats extends StatsOverviewWidget
                 'critical' => AuditLog::query()->where('occurred_at', '>=', $today)->where('severity', 'critical')->count(),
                 'projects' => Project::query()->whereNull('archived_at')->where('is_active', true)->count(),
                 'rejected' => $user->canGlobally('security_events.view')
-                    ? SecurityEvent::query()->where('created_at', '>=', now()->subDay())->count()
+                    // Summary rows stand for request_meta.suppressed attempts (D21).
+                    ? (int) SecurityEvent::query()->where('created_at', '>=', now()->subDay())
+                        ->selectRaw("COALESCE(SUM(COALESCE(JSON_VALUE(request_meta, '$.suppressed'), 1)), 0) AS attempts")
+                        ->value('attempts')
                     : null,
                 'failed_batches' => IngestionBatch::query()
                     ->when($user->projectIdsWith('logs.view') !== null, fn ($q) => $q->whereIn('project_id', $user->projectIdsWith('logs.view')))

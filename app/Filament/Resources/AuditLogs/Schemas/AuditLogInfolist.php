@@ -29,8 +29,10 @@ class AuditLogInfolist
                     ->formatStateUsing(fn (string $state) => AuditLogsTable::SEVERITY_LABELS[$state] ?? $state)
                     ->color(fn (string $state) => AuditLogsTable::SEVERITY_COLORS[$state] ?? 'gray'),
                 TextEntry::make('project.name')->label('المشروع'),
-                TextEntry::make('occurred_at')->label('وقت الحدث (UTC)')->dateTime('Y-m-d H:i:s'),
-                TextEntry::make('received_at')->label('وقت الاستلام (UTC)')->dateTime('Y-m-d H:i:s'),
+                TextEntry::make('occurred_at')->label('وقت الحدث')->dateTime('Y-m-d H:i:s.v')
+                    ->hint(fn (AuditLog $record): string => $record->occurred_at->utc()->format('Y-m-d H:i:s.v').' UTC'),
+                TextEntry::make('received_at')->label('وقت الاستلام')->dateTime('Y-m-d H:i:s.v')
+                    ->hint(fn (AuditLog $record): string => $record->received_at->utc()->format('Y-m-d H:i:s.v').' UTC'),
                 TextEntry::make('tags')->label('الوسوم')->badge()
                     ->visible(fn (AuditLog $record): bool => filled($record->tags)),
             ]),

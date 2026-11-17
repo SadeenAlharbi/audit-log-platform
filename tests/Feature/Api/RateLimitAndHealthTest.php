@@ -59,4 +59,16 @@ it('stores a bounded number of security events per IP and minute', function () {
     }
 
     expect(SecurityEvent::query()->count())->toBe(2);
+
+    // The other 3 are counted, then written as one summary row (D21).
+    $this->travel(1)->minutes();
+    $this->artisan('audit:flush-security-events')->expectsOutputToContain('3 counted attempt(s) written')->assertSuccessful();
+
+    $summary = SecurityEvent::query()->latest('id')->first();
+    expect(SecurityEvent::query()->count())->toBe(3)
+        ->and($summary->reason)->toBe('missing_credentials')
+        ->and($summary->request_meta['suppressed'])->toBe(3);
+
+    // Flushed once only.
+    $this->artisan('audit:flush-security-events')->expectsOutputToContain('0 counted attempt(s) written');
 });

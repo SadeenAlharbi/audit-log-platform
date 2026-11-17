@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SecurityEvents\Tables;
 use App\Filament\Support\Labels;
 use App\Models\Project;
 use App\Services\Security\SecurityEventRecorder;
+use App\Support\Time\DisplayTime;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
@@ -23,6 +24,9 @@ class SecurityEventsTable
                 TextColumn::make('created_at')->label('الوقت')->dateTime('Y-m-d H:i:s')->sortable(),
                 TextColumn::make('reason')->label('السبب')->badge()->color('danger')
                     ->formatStateUsing(fn (string $state) => Labels::reason($state)),
+                // Summary rows (D21) stand for many attempts of the same minute.
+                TextColumn::make('request_meta.suppressed')->label('المحاولات')->numeric()->default(1)
+                    ->badge()->color(fn ($state) => (int) $state > 1 ? 'warning' : 'gray'),
                 TextColumn::make('ip')->label('عنوان IP')->searchable()->fontFamily('mono')->copyable(),
                 TextColumn::make('project.name')->label('المشروع')->placeholder('غير معروف'),
                 TextColumn::make('apiKey.key_prefix')->label('المفتاح')->fontFamily('mono')->placeholder('—'),
@@ -35,12 +39,13 @@ class SecurityEventsTable
                     ->options(fn () => Project::query()->orderBy('name')->pluck('name', 'id')->all()),
                 Filter::make('period')
                     ->schema([
-                        DatePicker::make('from')->label('من')->default(now()->subDays(7)),
+                        DatePicker::make('from')->label('من')->default(fn () => DisplayTime::now()->subDays(7)->toDateString()),
                         DatePicker::make('until')->label('إلى'),
                     ])
                     ->query(fn (Builder $q, array $data) => $q
-                        ->when($data['from'] ?? null, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
-                        ->when($data['until'] ?? null, fn ($q, $d) => $q->whereDate('created_at', '<=', $d))),
+                        // Local days (DisplayTime) converted to UTC ranges.
+                        ->when($data['from'] ?? null, fn ($q, $d) => $q->where('created_at', '>=', DisplayTime::dayRangeUtc($d)[0]))
+                        ->when($data['until'] ?? null, fn ($q, $d) => $q->where('created_at', '<=', DisplayTime::dayRangeUtc($d)[1]))),
             ])
             ->recordActions([ViewAction::make()])
             ->toolbarActions([]);

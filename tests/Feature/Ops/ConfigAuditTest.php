@@ -41,12 +41,12 @@ it('shows a configuration change as before / after rows of the changed settings 
 
 it('reads the other platform audit shapes', function () {
     expect(PlatformAuditChanges::diffRows('user.updated', ['name' => ['old' => 'A', 'new' => 'B']]))
-        ->toBe([['key' => 'name', 'old' => 'A', 'new' => 'B', 'status' => 'changed']])
+        ->toBe([['key' => 'الاسم', 'old' => 'A', 'new' => 'B', 'status' => 'changed']])
         ->and(PlatformAuditChanges::diffRows('api_key.allowed_ips_updated', ['old' => [], 'new' => ['10.0.0.1']]))
-        ->toBe([['key' => 'allowed_ips', 'old' => '[]', 'new' => '["10.0.0.1"]', 'status' => 'changed']])
+        ->toBe([['key' => 'عناوين IP المسموحة', 'old' => '[]', 'new' => '["10.0.0.1"]', 'status' => 'changed']])
         ->and(PlatformAuditChanges::diffRows('logs.exported', ['format' => 'csv', 'filters' => ['severity' => 'critical']]))->toBeNull()
         ->and(PlatformAuditChanges::details('logs.exported', ['format' => 'csv', 'filters' => ['severity' => 'critical']]))
-        ->toBe(['format' => 'csv', 'filters.severity' => 'critical']);
+        ->toBe(['الصيغة' => 'csv', 'filters.severity' => 'critical']);
 });
 
 it('names the roles in the record when they are assigned by id', function () {

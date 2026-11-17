@@ -87,7 +87,39 @@ final class Labels
         'bytes' => 'الحجم (بايت)',
         'request_id' => 'رقم الطلب',
         'count' => 'العدد',
+        // Summary row of attempts over the per-minute sample (D21).
+        'suppressed' => 'عدد المحاولات في هذه الدقيقة',
+        'window_start' => 'بداية الدقيقة',
+        'note' => 'ملاحظة',
     ];
+
+    /**
+     * Field names in platform_audit details (the platform's own columns and
+     * record() payloads). Audit logs of other systems keep their own keys.
+     *
+     * @var array<string, string>
+     */
+    public const FIELDS = [
+        'id' => 'المعرّف', 'name' => 'الاسم', 'email' => 'البريد', 'is_active' => 'نشط',
+        'password_changed_at' => 'تغيير كلمة المرور', 'email_verified_at' => 'تأكيد البريد',
+        'slug' => 'المعرّف (X-Project)', 'description' => 'الوصف', 'retention_days' => 'مدة الاحتفاظ (يوم)',
+        'archived_at' => 'وقت الأرشفة', 'archived_by' => 'أرشفه', 'created_by' => 'أنشأه',
+        'project' => 'المشروع', 'project_id' => 'المشروع', 'user_id' => 'المستخدم', 'role' => 'الدور',
+        'environment' => 'البيئة', 'scopes' => 'الصلاحية', 'signed' => 'موقّع', 'allowed_ips' => 'عناوين IP المسموحة',
+        'expires_at' => 'ينتهي', 'revoked_at' => 'وقت الإلغاء', 'revoked_by' => 'ألغاه', 'key_prefix' => 'بادئة المفتاح',
+        'replaced_by' => 'المفتاح البديل', 'old_key_expires_at' => 'انتهاء المفتاح القديم',
+        'reason' => 'السبب', 'method' => 'الطريقة', 'via' => 'عن طريق', 'ip' => 'عنوان IP', 'locked' => 'مقفل',
+        'attempts' => 'المحاولات', 'format' => 'الصيغة', 'rows' => 'عدد الصفوف', 'truncated' => 'مقتطع',
+        'file' => 'الملف', 'sensitive_only' => 'الحساسة فقط', 'mailed_to' => 'أُرسل إلى', 'deleted' => 'المحذوف',
+        'type' => 'النوع', 'status' => 'الحالة', 'stage' => 'المرحلة', 'stored' => 'المخزَّن', 'uid' => 'رقم السجل',
+        'http_status' => 'رمز الاستجابة', 'idp' => 'مزوّد الهوية', 'uuid' => 'المعرّف', 'watermark' => 'آخر ما أُرشف',
+        'filters' => 'التصفيات', 'items' => 'العناصر', 'identifier_hash' => 'بصمة المعرّف', 'value' => 'القيمة',
+    ];
+
+    public static function field(string $key): string
+    {
+        return self::FIELDS[$key] ?? $key;
+    }
 
     /** @var array<string, string> */
     public const ACTIONS = [

@@ -24,7 +24,7 @@
             <tbody>
                 @foreach ($rows as $row)
                     <tr class="alh-diff-{{ $row['status'] }}">
-                        <td><code dir="ltr">{{ $row['key'] }}</code></td>
+                        <td><code dir="auto">{{ $row['key'] }}</code></td>
                         <td><span class="alh-diff-old" dir="auto">{{ $row['old'] ?? '—' }}</span></td>
                         <td><span class="alh-diff-new" dir="auto">{{ $row['new'] ?? '—' }}</span></td>
                         <td><span class="alh-diff-badge">{{ $labels[$row['status']] ?? $row['status'] }}</span></td>

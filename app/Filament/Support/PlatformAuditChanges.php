@@ -3,6 +3,7 @@
 namespace App\Filament\Support;
 
 use App\Listeners\RecordPermissionChanges;
+use App\Support\Time\DisplayTime;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -46,7 +47,7 @@ final class PlatformAuditChanges
         if (array_keys($changes) === ['old', 'new']) {
             $key = $action === 'api_key.allowed_ips_updated' ? 'allowed_ips' : 'value';
 
-            return ValueDiff::rows([$key => $changes['old']], [$key => $changes['new']]);
+            return self::labelled(ValueDiff::rows([$key => $changes['old']], [$key => $changes['new']]));
         }
 
         if (self::isFieldDiff($changes)) {
@@ -56,7 +57,7 @@ final class PlatformAuditChanges
                 $new[$field] = $pair['new'];
             }
 
-            return array_values(array_filter(ValueDiff::rows($old, $new), fn (array $row): bool => $row['status'] !== 'same'));
+            return self::labelled(array_values(array_filter(ValueDiff::rows($old, $new), fn (array $row): bool => $row['status'] !== 'same')));
         }
 
         return null;
@@ -96,7 +97,27 @@ final class PlatformAuditChanges
             return [$isRole ? 'الأدوار' : 'الصلاحيات' => implode('، ', $labels)];
         }
 
-        return array_map(self::scalar(...), self::flatten($changes));
+        $out = [];
+        foreach (self::flatten($changes) as $key => $value) {
+            $out[Labels::field($key)] = self::friendly(self::scalar($value));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Arabic names for the platform's own fields (settings keep their keys).
+     *
+     * @param  list<array{key: string, old: string|null, new: string|null, status: string}>  $rows
+     * @return list<array{key: string, old: string|null, new: string|null, status: string}>
+     */
+    private static function labelled(array $rows): array
+    {
+        return array_map(fn (array $row): array => [
+            'key' => Labels::field($row['key']),
+            'old' => $row['old'] === null ? null : self::friendly($row['old']),
+            'new' => $row['new'] === null ? null : self::friendly($row['new']),
+        ] + $row, $rows);
     }
 
     /** @param array<mixed> $changes */
@@ -134,6 +155,18 @@ final class PlatformAuditChanges
         }
 
         return $out;
+    }
+
+    /** true / false / null and ISO times as the dashboard shows them (settings keep raw values). */
+    private static function friendly(string $value): string
+    {
+        return match (true) {
+            $value === 'true' => 'نعم',
+            $value === 'false' => 'لا',
+            $value === 'null', $value === '' => '—',
+            preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $value) === 1 => DisplayTime::local($value)->format('Y-m-d H:i'),
+            default => $value,
+        };
     }
 
     private static function scalar(mixed $value): string

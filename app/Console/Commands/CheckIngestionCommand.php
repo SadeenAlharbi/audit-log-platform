@@ -67,7 +67,7 @@ class CheckIngestionCommand extends Command
             message: "{$total} log(s) accepted more than {$grace} minutes ago are not in audit_logs and {$stuck} batch(es) are still queued. "
                 .'Check `php artisan queue:failed` and Horizon; see the runbook (lost ingest jobs).',
             level: 'critical',
-            context: ['projects' => $missing->pluck('missing', 'slug')->all(), 'stuck_batches' => $stuck],
+            context: ['projects' => $missing->map(fn ($r) => "{$r->slug}: {$r->missing}")->implode(', '), 'stuck_batches' => $stuck],
         );
 
         return self::FAILURE;

@@ -23,9 +23,10 @@ class LogVolumeChart extends ChartWidget
     {
         $user = auth()->user();
 
-        /** @var list<array{day: string, severity: string, total: int}> $rows */
         // Days are the users' local days (DisplayTime), not UTC days.
         $offset = DisplayTime::offsetMinutes();
+
+        /** @var list<array{day: string, severity: string, total: int}> $rows */
         $rows = Cache::remember('dashboard:volume:'.$user->id, 300, fn () => AuditLog::query()
             ->where('occurred_at', '>=', DisplayTime::startOfDayUtc(13))
             ->selectRaw("DATE(DATE_ADD(occurred_at, INTERVAL {$offset} MINUTE)) AS day, severity, COUNT(*) AS total")
